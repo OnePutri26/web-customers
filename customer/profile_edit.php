@@ -15,7 +15,7 @@ $message = "";
 $error = "";
 
 $stmt = $conn->prepare("
-    SELECT id, username, email, telephone, alamat
+    SELECT id, username, email, telephone, alamat, role
     FROM users
     WHERE id = ?
     LIMIT 1
