@@ -3,7 +3,7 @@ session_start();
 require_once '../config/database.php';
 
 // Cek login
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id'])) { 
     header("Location: ../login.php");
     exit;
 }
