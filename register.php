@@ -203,9 +203,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <title>Register Customer - WiFi Management System</title>
 
+    <!-- Bootstrap -->
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
         rel="stylesheet"
+    >
+
+    <!-- Register CSS -->
+    <link
+        rel="stylesheet"
+        href="assets/css/register.css"
     >
 
 </head>
@@ -236,17 +243,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?= htmlspecialchars($error) ?>
                         </div>
 
-                    <?php endif; ?>
+                <?php endif; ?>
 
-                    <?php if ($success !== ''): ?>
 
-                        <div class="alert alert-success">
+                <!-- Success -->
+
+                <?php if ($success !== ''): ?>
+
+                    <div class="alert alert-success custom-alert">
+
+                        <span class="alert-icon">
+                            ✓
+                        </span>
+
+                        <span>
                             <?= htmlspecialchars($success) ?>
+                        </span>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+                <form method="POST" action="">
+
+
+                    <!-- =====================================
+                         PERSONAL DATA
+                    ====================================== -->
+
+                    <div class="section-title">
+
+                        <span class="section-number">
+                            01
+                        </span>
+
+                        <div>
+                            <strong>Data Pribadi</strong>
+
+                            <small>
+                                Informasi dasar customer
+                            </small>
                         </div>
 
-                    <?php endif; ?>
+                    </div>
 
-                    <form method="POST" action="">
 
                         <!-- Nama -->
                         <div class="mb-3">
@@ -270,8 +311,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         </div>
 
-                        <!-- Telephone -->
-                        <div class="mb-3">
+                    </div>
+
+
+                    <!-- Telephone -->
+
+                    <div class="form-group">
 
                             <label
                                 for="telephone"
@@ -292,15 +337,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         </div>
 
-                        <!-- Email -->
-                        <div class="mb-3">
+                    </div>
 
-                            <label
-                                for="email"
-                                class="form-label"
-                            >
-                                Email
-                            </label>
+
+                    <!-- Email -->
+
+                    <div class="form-group">
+
+                        <label
+                            for="email"
+                            class="form-label"
+                        >
+                            Email
+                            <span class="optional">
+                                Opsional
+                            </span>
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+                                ✉️
+                            </span>
 
                             <input
                                 type="email"
@@ -313,15 +371,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         </div>
 
-                        <!-- Alamat -->
-                        <div class="mb-3">
+                    </div>
 
-                            <label
-                                for="alamat"
-                                class="form-label"
-                            >
-                                Alamat
-                            </label>
+
+                    <!-- Alamat -->
+
+                    <div class="form-group">
+
+                        <label
+                            for="alamat"
+                            class="form-label"
+                        >
+                            Alamat Lengkap
+                        </label>
+
+                        <div class="input-wrapper textarea-wrapper">
+
+                            <span class="input-icon textarea-icon">
+                                📍
+                            </span>
 
                             <textarea
                                 id="alamat"
@@ -334,15 +402,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         </div>
 
-                        <!-- Username -->
-                        <div class="mb-3">
+                    </div>
 
-                            <label
-                                for="username"
-                                class="form-label"
-                            >
-                                Username
-                            </label>
+
+                    <!-- =====================================
+                         ACCOUNT DATA
+                    ====================================== -->
+
+                    <div class="section-title account-section">
+
+                        <span class="section-number">
+                            02
+                        </span>
+
+                        <div>
+                            <strong>Data Akun</strong>
+
+                            <small>
+                                Digunakan untuk login
+                            </small>
+                        </div>
+
+                    </div>
+
+
+                    <!-- Username -->
+
+                    <div class="form-group">
+
+                        <label
+                            for="username"
+                            class="form-label"
+                        >
+                            Username
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+                                @
+                            </span>
 
                             <input
                                 type="text"
@@ -352,19 +451,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 placeholder="Masukkan username"
                                 value="<?= htmlspecialchars($username) ?>"
                                 required
+                                autocomplete="username"
                             >
 
                         </div>
 
-                        <!-- Password -->
-                        <div class="mb-3">
+                    </div>
 
-                            <label
-                                for="password"
-                                class="form-label"
-                            >
-                                Password
-                            </label>
+
+                    <!-- Password -->
+
+                    <div class="form-group">
+
+                        <label
+                            for="password"
+                            class="form-label"
+                        >
+                            Password
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+                                🔒
+                            </span>
 
                             <input
                                 type="password"
@@ -374,30 +484,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 placeholder="Minimal 6 karakter"
                                 minlength="6"
                                 required
+                                autocomplete="new-password"
                             >
 
                         </div>
 
-                        <button
-                            type="submit"
-                            class="btn btn-primary w-100"
-                        >
-                            Daftar
-                        </button>
-
-                    </form>
-
-                    <div class="text-center mt-3">
-
-                        Sudah punya akun?
-
-                        <a href="login.php">
-                            Login di sini
-                        </a>
+                        <div class="password-hint">
+                            Minimal 6 karakter
+                        </div>
 
                     </div>
 
+
+                    <!-- Submit -->
+
+                    <button
+                        type="submit"
+                        class="register-btn"
+                    >
+
+                        <span>
+                            Buat Akun
+                        </span>
+
+                        <span class="btn-arrow">
+                            →
+                        </span>
+
+                    </button>
+
+
+                </form>
+
+
+                <!-- Login -->
+
+                <div class="login-link">
+
+                    Sudah punya akun?
+
+                    <a href="login.php">
+                        Login di sini
+                    </a>
+
                 </div>
+
+
+                <div class="security-text">
+
+                    🔐 Registrasi aman & terproteksi
+
+                </div>
+
 
             </div>
 
@@ -405,7 +543,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     </div>
 
-</div>
-
 </body>
+
 </html>
