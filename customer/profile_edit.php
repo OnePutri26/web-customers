@@ -14,13 +14,6 @@ $user_id = $_SESSION['user_id'];
 $message = "";
 $error = "";
 
-/*
-|--------------------------------------------------------------------------
-| AMBIL DATA USER
-|--------------------------------------------------------------------------
-| SESUAIKAN nama kolom dengan database kamu.
-*/
-
 $stmt = $conn->prepare("
     SELECT id, username, email, telephone, alamat
     FROM users
@@ -35,29 +28,39 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
 if (!$user) {
-    die("Data user tidak ditemukan.");
+    session_destroy();
+    header("Location: ../login.php");
+    exit;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| UPDATE PROFILE
-|--------------------------------------------------------------------------
-*/
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $username   = trim($_POST['username'] ?? '');
-    $password  = trim($_POST['email'] ?? '');
+    $username  = trim($_POST['username'] ?? '');
+    $email     = trim($_POST['email'] ?? '');
     $telephone = trim($_POST['telephone'] ?? '');
-    $alamat = trim($_POST['alamat'] ?? '');
+    $alamat    = trim($_POST['alamat'] ?? '');
+
 
     // Validasi
     if ($username === '') {
-        $error = "Username wajib diisi.";
-    } elseif ($password === '') {
-        $error = "Password wajib diisi.";
+
+        $error = "Nama pengguna wajib diisi.";
+
+    } elseif ($email === '') {
+
+        $error = "Email wajib diisi.";
+
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+        $error = "Format email tidak valid.";
+
     } else {
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE DATABASE
+        |--------------------------------------------------------------------------
+        */
 
         $update = $conn->prepare("
             UPDATE users
@@ -77,24 +80,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user_id
         );
 
+
         if ($update->execute()) {
 
-            // Update session nama jika digunakan di dashboard
+            // Update session
             $_SESSION['nama'] = $username;
+            $_SESSION['username'] = $username;
 
             $message = "Profile berhasil diperbarui.";
 
             // Update data yang ditampilkan
-            $user['username'] = $username;
-            $user['email'] = $email;
+            $user['username']  = $username;
+            $user['email']     = $email;
             $user['telephone'] = $telephone;
-            $user['alamat'] = $alamat;
+            $user['alamat']    = $alamat;
 
         } else {
+
             $error = "Gagal memperbarui profile.";
+
         }
+
+        $update->close();
     }
 }
+
+
+// Inisial avatar
+$initial = strtoupper(
+    substr(
+        trim($user['username'] ?? 'U'),
+        0,
+        1
+    )
+);
 
 ?>
 
@@ -105,254 +124,443 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <title>Edit Profile</title>
+    <title>Edit Profile - WiFi Management</title>
 
+
+    <!-- Bootstrap -->
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
         rel="stylesheet"
     >
 
-    <style>
 
-        body {
-            background: #f5f7fb;
-            font-family: Arial, sans-serif;
-        }
+    <!-- Bootstrap Icons -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
 
-        .profile-container {
-            max-width: 650px;
-            margin: 50px auto;
-        }
 
-        .profile-card {
-            background: white;
-            border-radius: 20px;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,.08);
-            overflow: hidden;
-        }
-
-        .profile-header {
-            background: linear-gradient(
-                135deg,
-                #0d6efd,
-                #0b5ed7
-            );
-
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .profile-avatar {
-            width: 80px;
-            height: 80px;
-
-            margin: auto;
-            margin-bottom: 15px;
-
-            border-radius: 50%;
-
-            background: white;
-            color: #0d6efd;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            font-size: 32px;
-            font-weight: bold;
-        }
-
-        .profile-body {
-            padding: 30px;
-        }
-
-        .form-label {
-            font-weight: 600;
-        }
-
-        .btn-save {
-            border-radius: 10px;
-            padding: 10px 20px;
-        }
-
-        .btn-back {
-            border-radius: 10px;
-            padding: 10px 20px;
-        }
-
-    </style>
+    <!-- CSS -->
+    <link
+        rel="stylesheet"
+        href="assets/css/profile-edit.css"
+    >
 
 </head>
 
+
 <body>
 
-<div class="container">
 
-    <div class="profile-container">
+<div class="edit-page">
 
-        <div class="card profile-card">
+    <nav class="edit-navbar">
 
-            <!-- HEADER -->
+        <div class="nav-left">
 
-            <div class="profile-header">
-
-                <div class="profile-avatar">
-
-                    <?= strtoupper(
-                        substr(
-                            $user['username'] ?? 'U',
-                            0,
-                            1
-                        )
-                    ) ?>
-
-                </div>
-
-                <h4 class="mb-1">
-                    Edit Profile
-                </h4>
-
-                <small>
-                    Perbarui informasi profile kamu
-                </small>
-
-            </div>
+            <a
+                href="profile.php"
+                class="back-button"
+            >
+                <i class="bi bi-arrow-left"></i>
+            </a>
 
 
-            <!-- BODY -->
+            <div class="nav-title">
 
-            <div class="profile-body">
+                <h5>Edit Profile</h5>
 
-                <?php if ($message): ?>
-
-                    <div class="alert alert-success">
-                        <?= htmlspecialchars($message) ?>
-                    </div>
-
-                <?php endif; ?>
-
-
-                <?php if ($error): ?>
-
-                    <div class="alert alert-danger">
-                        <?= htmlspecialchars($error) ?>
-                    </div>
-
-                <?php endif; ?>
-
-
-                <form method="POST">
-
-
-                    <!-- NAMA -->
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Nama Lengkap
-                        </label>
-
-                        <input
-                            type="text"
-                            name="username"
-                            class="form-control"
-                            value="<?= htmlspecialchars($user['username'] ?? '') ?>"
-                            required
-                        >
-
-                    </div>
-
-
-                    <!-- EMAIL -->
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Email
-                        </label>
-
-                        <input
-                            type="email"
-                            name="email"
-                            class="form-control"
-                            value="<?= htmlspecialchars($user['email'] ?? '') ?>"
-                            required
-                        >
-
-                    </div>
-
-
-                    <!-- NOMOR HP -->
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Nomor HP
-                        </label>
-
-                        <input
-                            type="text"
-                            name="telephone"
-                            class="form-control"
-                            value="<?= htmlspecialchars($user['telephone'] ?? '') ?>"
-                            placeholder="08xxxxxxxxxx"
-                        >
-
-                    </div>
-
-
-                    <!-- ALAMAT -->
-
-                    <div class="mb-4">
-
-                        <label class="form-label">
-                            Alamat
-                        </label>
-
-                        <textarea
-                            name="alamat"
-                            class="form-control"
-                            rows="3"
-                            placeholder="Masukkan alamat"
-                        ><?= htmlspecialchars($user['alamat'] ?? '') ?></textarea>
-
-                    </div>
-
-
-                    <!-- BUTTON -->
-
-                    <div class="d-flex gap-2">
-
-                        <button
-                            type="submit"
-                            class="btn btn-primary btn-save"
-                        >
-                            💾 Simpan Perubahan
-                        </button>
-
-
-                        <a
-                            href="profile.php"
-                            class="btn btn-outline-secondary btn-back"
-                        >
-                            Kembali
-                        </a>
-
-                    </div>
-
-                </form>
+                <span>
+                    Perbarui informasi akun kamu
+                </span>
 
             </div>
 
         </div>
 
-    </div>
+
+        <a
+            href="dashboard.php"
+            class="dashboard-button"
+        >
+
+            <i class="bi bi-grid-fill"></i>
+
+            <span>Dashboard</span>
+
+        </a>
+
+    </nav>
+
+
+
+    <!-- =====================================
+         MAIN
+    ====================================== -->
+
+    <main class="edit-container">
+
+
+        <!-- =====================================
+             HEADER PROFILE
+        ====================================== -->
+
+        <section class="edit-hero">
+
+            <div class="hero-circle circle-one"></div>
+
+            <div class="hero-circle circle-two"></div>
+
+
+            <div class="hero-content">
+
+                <div class="avatar-wrapper">
+
+                    <div class="profile-avatar">
+                        <?= htmlspecialchars($initial) ?>
+                    </div>
+
+                    <div class="avatar-camera">
+                        <i class="bi bi-pencil-fill"></i>
+                    </div>
+
+                </div>
+
+
+                <div class="hero-info">
+
+                    <span class="customer-label">
+
+                        <i class="bi bi-person-check-fill"></i>
+
+                        CUSTOMER ACCOUNT
+
+                    </span>
+
+
+                    <h1>
+                        <?= htmlspecialchars($user['username']) ?>
+                    </h1>
+
+
+                    <p>
+                        Perbarui informasi pribadi kamu di sini.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================
+             FORM CARD
+        ====================================== -->
+
+        <section class="edit-card">
+
+
+            <!-- CARD HEADER -->
+
+            <div class="edit-card-header">
+
+                <div class="header-icon">
+
+                    <i class="bi bi-person-vcard-fill"></i>
+
+                </div>
+
+
+                <div>
+
+                    <h2>Informasi Profile</h2>
+
+                    <p>
+                        Pastikan informasi yang kamu masukkan sudah benar.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- CARD BODY -->
+
+            <div class="edit-card-body">
+
+
+                <!-- SUCCESS -->
+
+                <?php if ($message): ?>
+
+                    <div class="custom-alert success-alert">
+
+                        <div class="alert-icon">
+                            <i class="bi bi-check-lg"></i>
+                        </div>
+
+                        <div>
+
+                            <strong>Berhasil</strong>
+
+                            <span>
+                                <?= htmlspecialchars($message) ?>
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+
+                <!-- ERROR -->
+
+                <?php if ($error): ?>
+
+                    <div class="custom-alert error-alert">
+
+                        <div class="alert-icon">
+                            <i class="bi bi-exclamation-lg"></i>
+                        </div>
+
+                        <div>
+
+                            <strong>Terjadi Kesalahan</strong>
+
+                            <span>
+                                <?= htmlspecialchars($error) ?>
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+
+                <form method="POST">
+
+
+                    <!-- =====================================
+                         USERNAME
+                    ====================================== -->
+
+                    <div class="form-group">
+
+                        <label for="username">
+
+                            <i class="bi bi-person-fill"></i>
+
+                            Nama Pengguna
+
+                        </label>
+
+
+                        <div class="input-box">
+
+                            <i class="bi bi-person input-icon"></i>
+
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                value="<?= htmlspecialchars($user['username'] ?? '') ?>"
+                                placeholder="Masukkan nama pengguna"
+                                autocomplete="username"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =====================================
+                         EMAIL
+                    ====================================== -->
+
+                    <div class="form-group">
+
+                        <label for="email">
+
+                            <i class="bi bi-envelope-fill"></i>
+
+                            Email
+
+                        </label>
+
+
+                        <div class="input-box">
+
+                            <i class="bi bi-envelope input-icon"></i>
+
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value="<?= htmlspecialchars($user['email'] ?? '') ?>"
+                                placeholder="contoh@email.com"
+                                autocomplete="email"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =====================================
+                         TELEPHONE
+                    ====================================== -->
+
+                    <div class="form-group">
+
+                        <label for="telephone">
+
+                            <i class="bi bi-telephone-fill"></i>
+
+                            Nomor Telepon
+
+                        </label>
+
+
+                        <div class="input-box">
+
+                            <i class="bi bi-phone input-icon"></i>
+
+                            <input
+                                type="text"
+                                id="telephone"
+                                name="telephone"
+                                value="<?= htmlspecialchars($user['telephone'] ?? '') ?>"
+                                placeholder="08xxxxxxxxxx"
+                                autocomplete="tel"
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =====================================
+                         ALAMAT
+                    ====================================== -->
+
+                    <div class="form-group">
+
+                        <label for="alamat">
+
+                            <i class="bi bi-geo-alt-fill"></i>
+
+                            Alamat
+
+                        </label>
+
+
+                        <div class="textarea-box">
+
+                            <i class="bi bi-geo-alt input-icon"></i>
+
+                            <textarea
+                                id="alamat"
+                                name="alamat"
+                                rows="4"
+                                placeholder="Masukkan alamat lengkap"
+                            ><?= htmlspecialchars($user['alamat'] ?? '') ?></textarea>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =====================================
+                         BUTTON
+                    ====================================== -->
+
+                    <div class="form-actions">
+
+
+                        <a
+                            href="profile.php"
+                            class="cancel-button"
+                        >
+
+                            <i class="bi bi-x-lg"></i>
+
+                            Batal
+
+                        </a>
+
+
+                        <button
+                            type="submit"
+                            class="save-button"
+                        >
+
+                            <i class="bi bi-check-lg"></i>
+
+                            Simpan Perubahan
+
+                        </button>
+
+
+                    </div>
+
+
+                </form>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================
+             SECURITY INFO
+        ====================================== -->
+
+        <div class="security-info">
+
+            <div class="security-icon">
+
+                <i class="bi bi-shield-check"></i>
+
+            </div>
+
+
+            <div>
+
+                <strong>Informasi akun aman</strong>
+
+                <span>
+                    Perubahan profile hanya dapat dilakukan oleh pemilik akun.
+                </span>
+
+            </div>
+
+        </div>
+
+
+    </main>
 
 </div>
+
 
 </body>
 

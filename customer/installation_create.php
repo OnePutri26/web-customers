@@ -20,7 +20,7 @@ $customer = $stmt->get_result()->fetch_assoc();
 
 $packages = $conn->query(
     "SELECT *
-     FROM users
+     FROM instalasi
      WHERE status = 'active'
      ORDER BY speed_mbps"
 );

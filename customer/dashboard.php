@@ -7,24 +7,45 @@ requireRole('customer');
 
 $userId = $_SESSION['user_id'];
 
-$stmt = $conn->prepare(
-    "SELECT *
-     FROM customers
-     WHERE user_id = ?"
-);
+
+/* ==============================
+   DATA CUSTOMER
+============================== */
+
+$stmt = $conn->prepare("
+    SELECT *
+    FROM customers
+    WHERE user_id = ?
+    LIMIT 1
+");
 
 $stmt->bind_param("i", $userId);
 $stmt->execute();
 
 $customer = $stmt->get_result()->fetch_assoc();
 
+if (!$customer) {
+    die("Data customer tidak ditemukan.");
+}
+
 $customerId = $customer['id'];
 
-$stmt = $conn->prepare(
-    "SELECT COUNT(*) total
-     FROM instalasi
-     WHERE id_customer = ?"
+$nama = $customer['nama'] ?? 'Customer';
+
+$initial = strtoupper(
+    substr(trim($nama), 0, 1)
 );
+
+
+/* ==============================
+   TOTAL INSTALASI
+============================== */
+
+$stmt = $conn->prepare("
+    SELECT COUNT(*) AS total
+    FROM instalasi
+    WHERE id_customer = ?
+");
 
 $stmt->bind_param("i", $customerId);
 $stmt->execute();
@@ -32,12 +53,17 @@ $stmt->execute();
 $totalInstalasi =
     $stmt->get_result()->fetch_assoc()['total'];
 
-$stmt = $conn->prepare(
-    "SELECT COUNT(*) total
-     FROM complaint
-     WHERE id_customer = ?
-     AND status NOT IN ('closed','resolved')"
-);
+
+/* ==============================
+   TOTAL COMPLAINT
+============================== */
+
+$stmt = $conn->prepare("
+    SELECT COUNT(*) AS total
+    FROM complaint
+    WHERE id_customer = ?
+    AND status NOT IN ('closed', 'resolved')
+");
 
 $stmt->bind_param("i", $customerId);
 $stmt->execute();
@@ -52,212 +78,722 @@ $totalComplaint =
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Dashboard Customer</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<link
-href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-rel="stylesheet"
->
+    <title>
+        Dashboard Customer
+    </title>
+
+
+    <!-- Bootstrap -->
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+
+    <!-- Bootstrap Icons -->
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
+
+
+    <!-- CSS -->
+
+    <link
+        rel="stylesheet"
+        href="assets/css/customer-dashboard.css"
+    >
 
 </head>
 
+
 <body>
 
-<nav class="navbar navbar-dark bg-primary">
 
-<div class="container">
+<!-- =====================================================
+     SIDEBAR
+===================================================== -->
 
-<span class="navbar-brand">
-📡 WiFi Customer
-</span>
+<aside class="sidebar">
 
-<div class="text-white">
-    Profile Saya
-</div>
 
-<a href="profile.php" class="text-white text-decoration-none">
-    👤 Profile Saya
-</a>
+    <!-- LOGO -->
 
-<?= htmlspecialchars($customer['nama']) ?>
+    <div class="sidebar-logo">
 
-<a
-href="../logout.php"
-class="btn btn-sm btn-light ms-2"
->
-Logout
-</a>
+        <div class="logo-icon">
+            <i class="bi bi-wifi"></i>
+        </div>
 
-</div>
+        <div class="logo-text">
 
-</div>
+            <h5>
+                WiFi Management
+            </h5>
 
-</nav>
+            <span>
+                Customer Portal
+            </span>
 
-<div class="container py-4">
+        </div>
 
-<h3>
-Halo, <?= htmlspecialchars($customer['nama']) ?> 👋
-</h3>
+    </div>
 
-<p class="text-muted">
-Selamat datang di layanan customer WiFi.
-</p>
 
-<div class="row g-3">
+    <!-- MENU -->
 
-<div class="col-md-4">
+    <div class="sidebar-menu">
 
-<div class="card shadow-sm border-0">
+        <p class="menu-title">
+            MENU
+        </p>
 
-<div class="card-body">
 
-<h6>Status internet</h6>
+        <a
+            href="dashboard.php"
+            class="menu-item active"
+        >
 
-<h2>
-<?= $totalInstalasi ?>
-</h2>
+            <i class="bi bi-grid-fill"></i>
 
-<a
-href="installation.php"
-class="btn btn-primary"
->
-Lihat
-</a>
+            <span>
+                Dashboard
+            </span>
 
-</div>
+        </a>
 
-</div>
 
-</div>
+        <a
+            href="profile.php"
+            class="menu-item"
+        >
 
-<div class="col-md-4">
+            <i class="bi bi-person-circle"></i>
 
-<div class="card shadow-sm border-0">
+            <span>
+                Profile Saya
+            </span>
 
-<div class="card-body">
+        </a>
 
-<h6>🎫 Laporan Gangguan</h6>
 
-<h2>
-<?= $totalComplaint ?>
-</h2>
+        <a
+            href="installation.php"
+            class="menu-item"
+        >
 
-<a
-href="complaint.php"
-class="btn btn-danger"
->
-Lihat Complaint
-</a>
+            <i class="bi bi-router-fill"></i>
 
-</div>
+            <span>
+                Instalasi
+            </span>
 
-</div>
+        </a>
 
-</div>
 
-<div class="col-md-4">
+        <a
+            href="complaint.php"
+            class="menu-item"
+        >
 
-<div class="card shadow-sm border-0">
+            <i class="bi bi-ticket-detailed-fill"></i>
 
-<div class="card-body">
+            <span>
+                Complaint
+            </span>
 
-<h6>🎫 Paket Internet</h6>
+        </a>
 
-<h2>
-<?= $totalComplaint ?>
-</h2>
 
-<a
-href="complaint.php"
-class="btn btn-danger"
->
-Lihat Complaint
-</a>
+        <p class="menu-title menu-account">
+            AKUN
+        </p>
 
-</div>
 
-</div>
+        <a
+            href="profile_edit.php"
+            class="menu-item"
+        >
 
-</div>
+            <i class="bi bi-pencil-square"></i>
 
-<div class="col-md-4">
+            <span>
+                Edit Profile
+            </span>
 
-<div class="card shadow-sm border-0">
+        </a>
 
-<div class="card-body">
 
-<h6>Customer ID</h6>
+        <a
+            href="../logout.php"
+            class="menu-item logout"
+        >
 
-<h2>
-<?= htmlspecialchars($customer['kode_pelanggan']) ?>
-</h2>
+            <i class="bi bi-box-arrow-right"></i>
 
-</div>
+            <span>
+                Logout
+            </span>
 
-</div>
+        </a>
 
-</div>
+    </div>
 
-</div>
 
-<div class="row mt-4">
+    <!-- USER -->
 
-<div class="col-md-6">
+    <div class="sidebar-user">
 
-<div class="card">
+        <div class="user-avatar">
 
-<div class="card-body">
+            <?= htmlspecialchars($initial) ?>
 
-<h5>📡 Pemasangan Baru</h5>
+        </div>
 
-<p>
-Ingin memasang WiFi baru?
-</p>
+        <div class="user-detail">
 
-<a
-href="installation_create.php"
-class="btn btn-primary"
->
-Ajukan Pemasangan
-</a>
+            <strong>
+                <?= htmlspecialchars($nama) ?>
+            </strong>
 
-</div>
+            <span>
+                Customer
+            </span>
 
-</div>
+        </div>
 
-</div>
+    </div>
 
-<div class="col-md-6">
+</aside>
 
-<div class="card">
 
-<div class="card-body">
 
-<h5> 🔧 Buat Tiket Gangguan</h5>
+<!-- =====================================================
+     MAIN
+===================================================== -->
 
-<p>
-Internet bermasalah?
-</p>
+<main class="main-content">
 
-<a
-href="complaint_create.php"
-class="btn btn-danger"
->
-Buat Complaint
-</a>
 
-</div>
+    <!-- TOPBAR -->
 
-</div>
+    <header class="topbar">
 
-</div>
+        <div>
 
-</div>
+            <h4>
+                Dashboard
+            </h4>
 
-</div>
+            <span>
+                Ringkasan layanan WiFi kamu
+            </span>
+
+        </div>
+
+
+        <div class="topbar-right">
+
+
+            <!-- NOTIFICATION -->
+
+            <div class="notification">
+
+                <i class="bi bi-bell"></i>
+
+                <?php if ($totalComplaint > 0): ?>
+
+                    <span class="notification-badge">
+
+                        <?= $totalComplaint ?>
+
+                    </span>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <!-- PROFILE -->
+
+            <a
+                href="profile.php"
+                class="top-profile"
+            >
+
+                <div class="top-avatar">
+
+                    <?= htmlspecialchars($initial) ?>
+
+                </div>
+
+                <div class="top-user">
+
+                    <strong>
+                        <?= htmlspecialchars($nama) ?>
+                    </strong>
+
+                    <span>
+                        Customer
+                    </span>
+
+                </div>
+
+            </a>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- CONTENT -->
+
+    <div class="content">
+
+
+        <!-- WELCOME -->
+
+        <section class="welcome-card">
+
+            <div class="welcome-content">
+
+                <span>
+                    CUSTOMER PORTAL
+                </span>
+
+                <h1>
+                    Halo, <?= htmlspecialchars($nama) ?> 👋
+                </h1>
+
+                <p>
+                    Selamat datang di dashboard customer.
+                    Kelola layanan WiFi kamu dengan mudah.
+                </p>
+
+            </div>
+
+
+            <div class="welcome-wifi">
+
+                <i class="bi bi-wifi"></i>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- STATISTIC -->
+
+        <div class="row g-4">
+
+
+            <!-- INSTALASI -->
+
+            <div class="col-lg-4 col-md-6">
+
+                <div class="stat-card">
+
+                    <div class="stat-icon blue">
+
+                        <i class="bi bi-router-fill"></i>
+
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>
+                            Instalasi WiFi
+                        </span>
+
+                        <h2>
+                            <?= $totalInstalasi ?>
+                        </h2>
+
+                        <small>
+                            Total pemasangan
+                        </small>
+
+                    </div>
+
+                    <a
+                        href="installation.php"
+                        class="stat-link"
+                    >
+
+                        <i class="bi bi-arrow-up-right"></i>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- COMPLAINT -->
+
+            <div class="col-lg-4 col-md-6">
+
+                <div class="stat-card">
+
+                    <div class="stat-icon orange">
+
+                        <i class="bi bi-ticket-perforated-fill"></i>
+
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>
+                            Complaint Aktif
+                        </span>
+
+                        <h2>
+                            <?= $totalComplaint ?>
+                        </h2>
+
+                        <small>
+                            Belum diselesaikan
+                        </small>
+
+                    </div>
+
+                    <a
+                        href="complaint.php"
+                        class="stat-link"
+                    >
+
+                        <i class="bi bi-arrow-up-right"></i>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- CUSTOMER ID -->
+
+            <div class="col-lg-4 col-md-12">
+
+                <div class="stat-card">
+
+                    <div class="stat-icon purple">
+
+                        <i class="bi bi-person-vcard-fill"></i>
+
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>
+                            Customer ID
+                        </span>
+
+                        <h2 class="customer-id">
+
+                            <?= htmlspecialchars(
+                                $customer['kode_pelanggan'] ?? '-'
+                            ) ?>
+
+                        </h2>
+
+                        <small>
+                            ID pelanggan
+                        </small>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- SECTION -->
+
+        <div class="section-header">
+
+            <div>
+
+                <h3>
+                    Layanan Customer
+                </h3>
+
+                <p>
+                    Pilih layanan yang ingin kamu gunakan.
+                </p>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ACTION -->
+
+        <div class="row g-4">
+
+
+            <!-- PEMASANGAN -->
+
+            <div class="col-lg-6">
+
+                <div class="service-card blue-card">
+
+                    <div class="service-icon">
+
+                        <i class="bi bi-router-fill"></i>
+
+                    </div>
+
+                    <div class="service-content">
+
+                        <span>
+                            PEMASANGAN
+                        </span>
+
+                        <h4>
+                            Pasang WiFi Baru
+                        </h4>
+
+                        <p>
+                            Ajukan pemasangan layanan WiFi
+                            baru dengan mudah.
+                        </p>
+
+                        <a
+                            href="installation_create.php"
+                            class="service-button"
+                        >
+
+                            Ajukan Pemasangan
+
+                            <i class="bi bi-arrow-right"></i>
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- COMPLAINT -->
+
+            <div class="col-lg-6">
+
+                <div class="service-card red-card">
+
+                    <div class="service-icon">
+
+                        <i class="bi bi-tools"></i>
+
+                    </div>
+
+                    <div class="service-content">
+
+                        <span>
+                            BANTUAN
+                        </span>
+
+                        <h4>
+                            Laporkan Gangguan
+                        </h4>
+
+                        <p>
+                            Internet bermasalah?
+                            Buat laporan gangguan sekarang.
+                        </p>
+
+                        <a
+                            href="complaint_create.php"
+                            class="service-button"
+                        >
+
+                            Buat Complaint
+
+                            <i class="bi bi-arrow-right"></i>
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ACCOUNT -->
+
+        <div class="section-header account-header">
+
+            <div>
+
+                <h3>
+                    Informasi Akun
+                </h3>
+
+                <p>
+                    Informasi customer yang terdaftar.
+                </p>
+
+            </div>
+
+            <a
+                href="profile.php"
+                class="view-profile"
+            >
+
+                Lihat Profile
+
+                <i class="bi bi-arrow-right"></i>
+
+            </a>
+
+        </div>
+
+
+
+        <div class="account-card">
+
+
+            <!-- NAMA -->
+
+            <div class="account-item">
+
+                <div class="account-icon">
+
+                    <i class="bi bi-person"></i>
+
+                </div>
+
+                <div>
+
+                    <span>
+                        Nama Lengkap
+                    </span>
+
+                    <strong>
+                        <?= htmlspecialchars($nama) ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- EMAIL -->
+
+            <div class="account-item">
+
+                <div class="account-icon">
+
+                    <i class="bi bi-envelope"></i>
+
+                </div>
+
+                <div>
+
+                    <span>
+                        Email
+                    </span>
+
+                    <strong>
+                        <?= htmlspecialchars(
+                            $customer['email'] ?? '-'
+                        ) ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- HP -->
+
+            <div class="account-item">
+
+                <div class="account-icon">
+
+                    <i class="bi bi-phone"></i>
+
+                </div>
+
+                <div>
+
+                    <span>
+                        Nomor HP
+                    </span>
+
+                    <strong>
+                        <?= htmlspecialchars(
+                            $customer['no_hp'] ?? '-'
+                        ) ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- ALAMAT -->
+
+            <div class="account-item">
+
+                <div class="account-icon">
+
+                    <i class="bi bi-geo-alt"></i>
+
+                </div>
+
+                <div>
+
+                    <span>
+                        Alamat
+                    </span>
+
+                    <strong>
+                        <?= htmlspecialchars(
+                            $customer['alamat'] ?? '-'
+                        ) ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+</main>
+
 
 </body>
+
 </html>

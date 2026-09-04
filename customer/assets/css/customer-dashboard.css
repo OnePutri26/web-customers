@@ -1,0 +1,973 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f5f7fb;
+    color: #172033;
+}
+
+
+/* =====================================================
+   SIDEBAR
+===================================================== */
+
+.sidebar {
+    position: fixed;
+
+    top: 0;
+    left: 0;
+
+    width: 255px;
+    height: 100vh;
+
+    background: #ffffff;
+
+    border-right: 1px solid #e9edf4;
+
+    display: flex;
+    flex-direction: column;
+
+    z-index: 1000;
+}
+
+
+/* LOGO */
+
+.sidebar-logo {
+    height: 88px;
+
+    padding: 0 22px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    border-bottom: 1px solid #edf0f5;
+}
+
+.logo-icon {
+    width: 43px;
+    height: 43px;
+
+    border-radius: 13px;
+
+    background: #0d6efd;
+
+    color: #ffffff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 22px;
+
+    box-shadow: 0 8px 20px rgba(13, 110, 253, .22);
+}
+
+.logo-text h5 {
+    margin: 0;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+.logo-text span {
+    font-size: 10px;
+
+    color: #929aaa;
+}
+
+
+/* MENU */
+
+.sidebar-menu {
+    padding: 25px 14px;
+
+    flex: 1;
+}
+
+.menu-title {
+    margin: 5px 12px 12px;
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+    letter-spacing: 1px;
+
+    color: #a0a8b7;
+}
+
+.menu-account {
+    margin-top: 30px;
+}
+
+.menu-item {
+    display: flex;
+
+    align-items: center;
+
+    gap: 13px;
+
+    padding: 12px 14px;
+
+    margin-bottom: 5px;
+
+    border-radius: 10px;
+
+    text-decoration: none;
+
+    color: #687386;
+
+    font-size: 13px;
+
+    transition: .2s ease;
+}
+
+.menu-item i {
+    width: 20px;
+
+    text-align: center;
+
+    font-size: 17px;
+}
+
+.menu-item:hover {
+    color: #0d6efd;
+
+    background: #f0f5ff;
+}
+
+.menu-item.active {
+    color: #ffffff;
+
+    background: #0d6efd;
+
+    box-shadow: 0 8px 18px rgba(13, 110, 253, .2);
+}
+
+.menu-item.logout {
+    color: #dc3545;
+}
+
+.menu-item.logout:hover {
+    background: #fff0f1;
+
+    color: #dc3545;
+}
+
+
+/* SIDEBAR USER */
+
+.sidebar-user {
+    padding: 18px 20px;
+
+    border-top: 1px solid #edf0f5;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+.user-avatar {
+    width: 38px;
+    height: 38px;
+
+    border-radius: 50%;
+
+    background: #e8f1ff;
+
+    color: #0d6efd;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+.user-detail strong {
+    display: block;
+
+    max-width: 140px;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 11px;
+}
+
+.user-detail span {
+    font-size: 10px;
+
+    color: #929aaa;
+}
+
+
+/* =====================================================
+   MAIN
+===================================================== */
+
+.main-content {
+    margin-left: 255px;
+
+    min-height: 100vh;
+}
+
+
+/* =====================================================
+   TOPBAR
+===================================================== */
+
+.topbar {
+    height: 88px;
+
+    padding: 0 35px;
+
+    background: #ffffff;
+
+    border-bottom: 1px solid #e9edf4;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+}
+
+.topbar h4 {
+    margin: 0;
+
+    font-size: 19px;
+
+    font-weight: 700;
+}
+
+.topbar > div:first-child span {
+    font-size: 11px;
+
+    color: #929aaa;
+}
+
+.topbar-right {
+    display: flex;
+
+    align-items: center;
+
+    gap: 25px;
+}
+
+
+/* NOTIFICATION */
+
+.notification {
+    position: relative;
+
+    color: #687386;
+
+    font-size: 20px;
+}
+
+.notification-badge {
+    position: absolute;
+
+    top: -6px;
+    right: -8px;
+
+    width: 17px;
+    height: 17px;
+
+    border-radius: 50%;
+
+    background: #dc3545;
+
+    color: #ffffff;
+
+    font-size: 9px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+/* PROFILE */
+
+.top-profile {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    text-decoration: none;
+
+    color: #172033;
+}
+
+.top-avatar {
+    width: 38px;
+    height: 38px;
+
+    border-radius: 50%;
+
+    background: #0d6efd;
+
+    color: #ffffff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 13px;
+
+    font-weight: 700;
+}
+
+.top-user strong {
+    display: block;
+
+    font-size: 11px;
+}
+
+.top-user span {
+    font-size: 9px;
+
+    color: #929aaa;
+}
+
+
+/* =====================================================
+   CONTENT
+===================================================== */
+
+.content {
+    padding: 32px 35px;
+}
+
+
+/* =====================================================
+   WELCOME
+===================================================== */
+
+.welcome-card {
+    position: relative;
+
+    overflow: hidden;
+
+    min-height: 185px;
+
+    padding: 32px;
+
+    margin-bottom: 28px;
+
+    border-radius: 18px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #0d6efd,
+            #397ef6
+        );
+
+    color: white;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    box-shadow: 0 12px 30px rgba(13, 110, 253, .18);
+}
+
+.welcome-card::after {
+    content: "";
+
+    position: absolute;
+
+    width: 260px;
+    height: 260px;
+
+    right: -80px;
+    top: -110px;
+
+    border-radius: 50%;
+
+    background: rgba(255,255,255,.08);
+}
+
+.welcome-content {
+    position: relative;
+
+    z-index: 2;
+}
+
+.welcome-content > span {
+    font-size: 9px;
+
+    font-weight: 700;
+
+    letter-spacing: 1.5px;
+
+    opacity: .75;
+}
+
+.welcome-content h1 {
+    margin: 8px 0;
+
+    font-size: 27px;
+
+    font-weight: 700;
+}
+
+.welcome-content p {
+    margin: 0;
+
+    font-size: 12px;
+
+    opacity: .85;
+}
+
+.welcome-wifi {
+    position: relative;
+
+    z-index: 2;
+
+    width: 95px;
+    height: 95px;
+
+    border-radius: 25px;
+
+    background: rgba(255,255,255,.13);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 47px;
+}
+
+
+/* =====================================================
+   STAT CARD
+===================================================== */
+
+.stat-card {
+    position: relative;
+
+    min-height: 145px;
+
+    padding: 24px;
+
+    background: #ffffff;
+
+    border: 1px solid #edf0f5;
+
+    border-radius: 15px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    transition: .25s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+
+    box-shadow: 0 12px 30px rgba(25, 40, 65, .08);
+}
+
+.stat-icon {
+    width: 53px;
+    height: 53px;
+
+    flex-shrink: 0;
+
+    border-radius: 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 22px;
+}
+
+.stat-icon.blue {
+    background: #eaf2ff;
+
+    color: #0d6efd;
+}
+
+.stat-icon.orange {
+    background: #fff2df;
+
+    color: #f59f00;
+}
+
+.stat-icon.purple {
+    background: #f0eaff;
+
+    color: #7950f2;
+}
+
+.stat-info span {
+    display: block;
+
+    font-size: 11px;
+
+    color: #8d96a6;
+}
+
+.stat-info h2 {
+    margin: 4px 0;
+
+    font-size: 25px;
+
+    font-weight: 700;
+}
+
+.stat-info small {
+    font-size: 9px;
+
+    color: #a0a7b4;
+}
+
+.customer-id {
+    font-size: 17px !important;
+}
+
+.stat-link {
+    position: absolute;
+
+    top: 18px;
+    right: 18px;
+
+    width: 29px;
+    height: 29px;
+
+    border-radius: 8px;
+
+    background: #f5f7fb;
+
+    color: #7b8494;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    text-decoration: none;
+
+    font-size: 12px;
+}
+
+.stat-link:hover {
+    background: #0d6efd;
+
+    color: white;
+}
+
+
+/* =====================================================
+   SECTION
+===================================================== */
+
+.section-header {
+    margin-top: 38px;
+
+    margin-bottom: 18px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+}
+
+.section-header h3 {
+    margin: 0;
+
+    font-size: 18px;
+
+    font-weight: 700;
+}
+
+.section-header p {
+    margin: 4px 0 0;
+
+    font-size: 11px;
+
+    color: #929aaa;
+}
+
+.account-header {
+    margin-top: 42px;
+}
+
+.view-profile {
+    color: #0d6efd;
+
+    font-size: 11px;
+
+    font-weight: 600;
+
+    text-decoration: none;
+}
+
+.view-profile:hover {
+    text-decoration: underline;
+}
+
+
+/* =====================================================
+   SERVICE CARD
+===================================================== */
+
+.service-card {
+    min-height: 205px;
+
+    padding: 27px;
+
+    border-radius: 17px;
+
+    display: flex;
+
+    gap: 20px;
+
+    transition: .25s ease;
+}
+
+.service-card:hover {
+    transform: translateY(-4px);
+
+    box-shadow: 0 15px 35px rgba(25, 40, 65, .08);
+}
+
+.blue-card {
+    background: #edf5ff;
+}
+
+.red-card {
+    background: #fff1f0;
+}
+
+.service-icon {
+    width: 55px;
+    height: 55px;
+
+    flex-shrink: 0;
+
+    border-radius: 15px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 23px;
+}
+
+.blue-card .service-icon {
+    background: #d9e9ff;
+
+    color: #0d6efd;
+}
+
+.red-card .service-icon {
+    background: #ffe0dd;
+
+    color: #dc3545;
+}
+
+.service-content > span {
+    font-size: 9px;
+
+    font-weight: 700;
+
+    letter-spacing: 1px;
+
+    color: #8993a3;
+}
+
+.service-content h4 {
+    margin: 6px 0;
+
+    font-size: 18px;
+
+    font-weight: 700;
+}
+
+.service-content p {
+    max-width: 390px;
+
+    margin: 0 0 13px;
+
+    color: #7d8798;
+
+    font-size: 11px;
+
+    line-height: 1.6;
+}
+
+.service-button {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 9px 13px;
+
+    border-radius: 8px;
+
+    background: white;
+
+    color: #0d6efd;
+
+    font-size: 10px;
+
+    font-weight: 600;
+
+    text-decoration: none;
+
+    box-shadow: 0 5px 12px rgba(0,0,0,.04);
+}
+
+.red-card .service-button {
+    color: #dc3545;
+}
+
+.service-button:hover {
+    background: #0d6efd;
+
+    color: white;
+}
+
+.red-card .service-button:hover {
+    background: #dc3545;
+
+    color: white;
+}
+
+
+/* =====================================================
+   ACCOUNT
+===================================================== */
+
+.account-card {
+    background: white;
+
+    border: 1px solid #edf0f5;
+
+    border-radius: 15px;
+
+    padding: 5px 20px;
+
+    display: grid;
+
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.account-item {
+    padding: 19px 12px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    border-bottom: 1px solid #f0f2f6;
+}
+
+.account-item:nth-child(3),
+.account-item:nth-child(4) {
+    border-bottom: none;
+}
+
+.account-icon {
+    width: 39px;
+    height: 39px;
+
+    border-radius: 10px;
+
+    background: #f0f5ff;
+
+    color: #0d6efd;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.account-item span {
+    display: block;
+
+    margin-bottom: 3px;
+
+    font-size: 9px;
+
+    color: #969eac;
+}
+
+.account-item strong {
+    display: block;
+
+    max-width: 240px;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 11px;
+
+    color: #273146;
+}
+
+
+/* =====================================================
+   TABLET
+===================================================== */
+
+@media (max-width: 992px) {
+
+    .sidebar {
+        width: 75px;
+    }
+
+    .logo-text,
+    .menu-title,
+    .menu-item span,
+    .user-detail {
+        display: none;
+    }
+
+    .sidebar-logo {
+        justify-content: center;
+
+        padding: 0;
+    }
+
+    .menu-item {
+        justify-content: center;
+    }
+
+    .sidebar-user {
+        justify-content: center;
+
+        padding: 18px 10px;
+    }
+
+    .main-content {
+        margin-left: 75px;
+    }
+
+}
+
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width: 768px) {
+
+    .topbar {
+        padding: 0 20px;
+    }
+
+    .top-user {
+        display: none;
+    }
+
+    .content {
+        padding: 22px 20px;
+    }
+
+    .welcome-card {
+        padding: 25px;
+
+        min-height: 160px;
+    }
+
+    .welcome-content h1 {
+        font-size: 22px;
+    }
+
+    .welcome-wifi {
+        width: 70px;
+        height: 70px;
+
+        font-size: 35px;
+    }
+
+    .account-card {
+        grid-template-columns: 1fr;
+    }
+
+    .account-item:nth-child(3) {
+        border-bottom: 1px solid #f0f2f6;
+    }
+
+    .account-item:nth-child(4) {
+        border-bottom: none;
+    }
+
+}
+
+
+/* =====================================================
+   SMALL MOBILE
+===================================================== */
+
+@media (max-width: 576px) {
+
+    .sidebar {
+        width: 0;
+
+        overflow: hidden;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .topbar {
+        height: 75px;
+    }
+
+    .content {
+        padding: 15px;
+    }
+
+    .welcome-wifi {
+        display: none;
+    }
+
+    .service-card {
+        flex-direction: column;
+
+        padding: 22px;
+    }
+
+    .stat-card {
+        padding: 20px;
+    }
+
+}
