@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="login-header">
 
                     <h2>
-                        Selamat Datang 👋
+                        Selamat HALLO 👋
                     </h2>
 
                     <p>
