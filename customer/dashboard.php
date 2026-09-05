@@ -1203,7 +1203,28 @@ $tanggalJatuhTempo =
      MONITORING BANDWIDTH + CHAT
 ===================================================== -->
 
-<div class="row g-4 mt-1">
+<div class="col-lg-8">
+
+    <div class="dashboard-card bandwidth-card">
+
+        <div class="card-title">
+
+            <div>
+                <h5>Monitoring Bandwidth</h5>
+                <span>Pemakaian jaringan secara real-time</span>
+            </div>
+
+            <span class="live-text">● LIVE</span>
+
+        </div>
+
+        <div class="bandwidth-chart">
+            <canvas id="bandwidthChart"></canvas>
+        </div>
+
+    </div>
+
+</div>
 
 
 <!-- BANDWIDTH CHART -->

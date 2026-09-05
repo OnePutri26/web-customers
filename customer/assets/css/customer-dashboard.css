@@ -1139,10 +1139,17 @@ body {
    BANDWIDTH CHART
 ===================================================== */
 
-#bandwidthChart {
-    width: 100% !important;
+.bandwidth-card {
+    height: 230px;
+    overflow: hidden;
+}
 
-    min-height: 230px;
+.bandwidth-chart {
+    height: 140px;
+}
+
+#bandwidthChart {
+    height: 140px !important;
 }
 
 
