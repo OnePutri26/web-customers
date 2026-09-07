@@ -5,32 +5,43 @@ require_once "../config/auth.php";
 
 requireRole('customer');
 
-$userId = $_SESSION['user_id'];
+$userId = (int) ($_SESSION['user_id'] ?? 0);
 
 $stmt = $conn->prepare(
     "SELECT id FROM customers WHERE user_id = ?"
 );
 
 $stmt->bind_param("i", $userId);
-$stmt->execute();
+
+if (!$stmt->execute()) {
+    die("Query customer gagal: " . $stmt->error);
+}
 
 $customer =
     $stmt->get_result()->fetch_assoc();
 
+if (!$customer) {
+    die("Data customer tidak ditemukan.");
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $category = $_POST['category'];
-    $subject = trim($_POST['subject']);
-    $description = trim($_POST['description']);
-    $priority = $_POST['priority'];
+    $category = trim((string) ($_POST['category'] ?? ''));
+    $subject = trim((string) ($_POST['subject'] ?? ''));
+    $description = trim((string) ($_POST['description'] ?? ''));
+    $priority = trim((string) ($_POST['priority'] ?? 'low'));
+
+    if ($category === '' || $subject === '' || $description === '') {
+        die("Data complaint belum lengkap.");
+    }
 
     $code =
         "CMP" . date("YmdHis") . rand(10,99);
 
     $stmt = $conn->prepare(
-        "INSERT INTO complaints
+        "INSERT INTO complaint
         (
-            customer_id,
+            id_customer,
             complaint_code,
             category,
             subject,
@@ -39,6 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         )
         VALUES (?, ?, ?, ?, ?, ?)"
     );
+
+    if (!$stmt) {
+        die("Query insert complaint gagal: " . $conn->error);
+    }
 
     $stmt->bind_param(
         "isssss",
@@ -50,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $priority
     );
 
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        die("Gagal menyimpan complaint: " . $stmt->error);
+    }
 
     header("Location: complaint.php");
     exit;

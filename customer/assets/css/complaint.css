@@ -1,428 +1,191 @@
 /* =========================================================
-   COMPLAINT PAGE
-<<<<<<< HEAD
-   STYLE: CUSTOMER DASHBOARD
-   ========================================================= */
+    COMPLAINT PAGE
+    ========================================================= */
 
 :root {
     --complaint-primary: #2563eb;
     --complaint-primary-dark: #1d4ed8;
-    --complaint-primary-soft: #eff6ff;
-=======
-   ========================================================= */
-
-:root {
-
-    --complaint-primary: #2563eb;
-    --complaint-primary-dark: #1d4ed8;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
-
     --complaint-bg: #f6f8fc;
     --complaint-card: #ffffff;
-
     --complaint-text: #172033;
+    --complaint-text-soft: #334155;
     --complaint-muted: #7b8497;
-
     --complaint-border: #e8ebf2;
-
     --complaint-green: #16a34a;
     --complaint-orange: #ea8b00;
     --complaint-red: #dc2626;
 
-<<<<<<< HEAD
-=======
     --complaint-purple: #7c3aed;
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     --complaint-radius: 16px;
+
+    --complaint-shadow:
+        0 4px 20px rgba(15, 23, 42, 0.06);
+
+    --complaint-shadow-hover:
+        0 10px 30px rgba(15, 23, 42, 0.10);
 }
 
+* {
+    box-sizing: border-box;
+}
 
-/* =========================================================
-   BODY
-   ========================================================= */
+/* BODY */
 
 body {
-<<<<<<< HEAD
-    margin: 0;
-
-    background: var(--complaint-bg);
-
-=======
 
     margin: 0;
-
     background: var(--complaint-bg);
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     color: var(--complaint-text);
-
     font-family:
         Inter,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
 
 /* =========================================================
-<<<<<<< HEAD
-   MAIN CONTAINER
-   ========================================================= */
-=======
    MAIN PAGE
    ========================================================= */
 
 .complaint-page {
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 
     width: 100%;
-
     max-width: 1600px;
-
     margin: 0 auto;
-
     padding: 32px;
 }
 
 
 /* =========================================================
-<<<<<<< HEAD
-   PAGE HEADER
-   ========================================================= */
-
-.complaint-header {
-=======
    HEADER
    ========================================================= */
 
 .complaint-header {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: flex-start;
-
-    gap: 20px;
-
+    gap: 24px;
     margin-bottom: 28px;
 }
 
-
 .breadcrumb-text {
-
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     color: var(--complaint-muted);
-
-    font-size: 13px;
-
-    font-weight: 500;
-
-    margin-bottom: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
 }
-
 
 .complaint-header h1 {
-
     margin: 0;
-
     color: var(--complaint-text);
-
-    font-size: 30px;
-
-    font-weight: 750;
-
-    letter-spacing: -0.6px;
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 800;
+    letter-spacing: -.8px;
+    line-height: 1.15;
 }
-
 
 .complaint-header p {
-
-    margin: 7px 0 0;
-
+    max-width: 650px;
+    margin: 8px 0 0;
     color: var(--complaint-muted);
-
     font-size: 14px;
+    line-height: 1.6;
 }
 
-
-/* =========================================================
-   HEADER ACTION
-   ========================================================= */
-
-.header-actions {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 10px;
-}
-
+/* BUTTON */
 
 .btn-add {
-
     display: inline-flex;
-
     align-items: center;
-
     justify-content: center;
-
-    gap: 8px;
-
+    gap: 9px;
     padding: 11px 17px;
-
-    color: white;
-
+    color: #fff;
     background: var(--complaint-primary);
-
+    border: 0;
     border-radius: 10px;
-
-    border: none;
-
     font-size: 14px;
-
     font-weight: 600;
-
     text-decoration: none;
-
-    transition:
-        transform 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease;
+    transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
 }
-
 
 .btn-add:hover {
-
-    color: white;
-
+    color: #fff;
     background: var(--complaint-primary-dark);
-
     transform: translateY(-1px);
-
-    box-shadow:
-        0 8px 20px rgba(37, 99, 235, 0.2);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, .2);
 }
 
-
-/* =========================================================
-   STATISTICS
-   ========================================================= */
+/* STATISTICS */
 
 .complaint-stat-grid {
-
     display: grid;
-
-    grid-template-columns:
-        repeat(4, minmax(0, 1fr));
-
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 18px;
-
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
-
 
 .complaint-stat-card {
-
     display: flex;
-
     align-items: center;
-
     gap: 15px;
-
     padding: 20px;
-
     background: var(--complaint-card);
-
     border: 1px solid var(--complaint-border);
-
     border-radius: var(--complaint-radius);
-
-    box-shadow:
-        0 3px 15px rgba(25, 35, 60, 0.035);
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
+    box-shadow: 0 3px 15px rgba(25, 35, 60, .035);
+    transition: transform .2s ease, box-shadow .2s ease;
 }
-
 
 .complaint-stat-card:hover {
-
     transform: translateY(-2px);
-
-    box-shadow:
-        0 10px 28px rgba(25, 35, 60, 0.07);
+    box-shadow: 0 10px 28px rgba(25, 35, 60, .07);
 }
 
-
-/* =========================================================
-   STAT ICON
-   ========================================================= */
-
-.stat-icon {
-
+.complaint-stat-icon {
     width: 48px;
-
     height: 48px;
-
     min-width: 48px;
-
     display: flex;
-
     align-items: center;
-
     justify-content: center;
-
     border-radius: 13px;
-
     font-size: 21px;
 }
 
-
-.icon-blue {
-
-    color: #2563eb;
-
-    background: #eff6ff;
-}
-
-
-.icon-green {
-
-    color: #16a34a;
-
-    background: #ecfdf3;
-}
-
-
-.icon-orange {
-
-    color: #ea8b00;
-
-    background: #fff7e8;
-}
-
-
-.icon-red {
-
-    color: #dc2626;
-
-    background: #fef2f2;
-}
-
-
-/* =========================================================
-   STAT CONTENT
-   ========================================================= */
-
-.stat-content {
-
+.complaint-stat-card .stat-content {
     display: flex;
-
     flex-direction: column;
-
     min-width: 0;
 }
 
-
-.stat-content span {
-
+.complaint-stat-card .stat-content span {
     color: var(--complaint-muted);
-
     font-size: 13px;
-
     font-weight: 500;
 }
 
-
-.stat-content strong {
-
+.complaint-stat-card .stat-content strong {
     margin-top: 3px;
-
     color: var(--complaint-text);
-
     font-size: 25px;
-
     line-height: 1.2;
-
     font-weight: 750;
 }
 
-
-.stat-content small {
-
+.complaint-stat-card .stat-content small {
     margin-top: 3px;
-
     color: #a0a7b5;
-
     font-size: 11px;
-}
-
-
-/* =========================================================
-   SUMMARY CARD
-   ========================================================= */
-
-.complaint-summary {
-
-    display: flex;
-
-    justify-content: space-between;
-
-    align-items: center;
-
-    padding: 21px 24px;
-
-    margin-bottom: 20px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #ffffff,
-            #f7faff
-        );
-
-    border: 1px solid var(--complaint-border);
-
-    border-radius: var(--complaint-radius);
-
-    box-shadow:
-        0 3px 15px rgba(25, 35, 60, 0.035);
-}
-
-
-.summary-left {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 15px;
-}
-
-
-.summary-icon {
-
-    width: 46px;
-
-    height: 46px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    border-radius: 12px;
-
-    background: #eff6ff;
-
-    color: var(--complaint-primary);
-
-    font-size: 20px;
 }
 
 
@@ -495,7 +258,6 @@ body {
 
 .complaint-card-header {
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     display: flex;
 
     align-items: center;
@@ -504,104 +266,6 @@ body {
 
     gap: 20px;
 
-<<<<<<< HEAD
-    min-height: 115px;
-
-    padding: 25px 28px;
-
-    background: var(--complaint-card);
-
-    border: 1px solid var(--complaint-border);
-
-    border-radius: var(--complaint-radius);
-
-    box-shadow:
-        0 3px 15px rgba(25, 35, 60, 0.035);
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
-}
-
-.complaint-header:hover {
-    box-shadow:
-        0 10px 28px rgba(25, 35, 60, 0.07);
-}
-
-
-/* =========================================================
-   HEADING
-   ========================================================= */
-
-.complaint-heading {
-    display: flex;
-
-    align-items: center;
-
-    gap: 15px;
-
-    min-width: 0;
-}
-
-
-/* =========================================================
-   HEADER ICON
-   ========================================================= */
-
-.complaint-icon {
-    width: 53px;
-    height: 53px;
-
-    min-width: 53px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    border-radius: 14px;
-
-    background: var(--complaint-primary-soft);
-
-    color: var(--complaint-primary);
-
-    font-size: 23px;
-}
-
-
-/* =========================================================
-   TITLE
-   ========================================================= */
-
-.complaint-title {
-    margin: 0;
-
-    color: var(--complaint-text);
-
-    font-size: 24px;
-
-    line-height: 1.2;
-
-    font-weight: 750;
-
-    letter-spacing: -0.4px;
-}
-
-
-/* =========================================================
-   SUBTITLE
-   ========================================================= */
-
-.complaint-subtitle {
-    margin: 6px 0 0;
-
-    color: var(--complaint-muted);
-
-    font-size: 13px;
-
-    line-height: 1.5;
-=======
     padding: 22px 24px;
 
     border-bottom: 1px solid var(--complaint-border);
@@ -627,29 +291,11 @@ body {
     color: var(--complaint-muted);
 
     font-size: 12px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 }
 
 
 /* =========================================================
-<<<<<<< HEAD
-   HEADER ACTION
-   ========================================================= */
-
-.complaint-header-action {
-    display: flex;
-
-    align-items: center;
-
-    flex-shrink: 0;
-}
-
-
-/* =========================================================
-   CREATE BUTTON
-=======
    TABLE TOOLS
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
    ========================================================= */
 
 .table-tools {
@@ -661,18 +307,12 @@ body {
     gap: 10px;
 }
 
-<<<<<<< HEAD
-    gap: 8px;
-
-    padding: 11px 17px;
-=======
 
 /* =========================================================
    SEARCH
    ========================================================= */
 
 .complaint-search {
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 
     position: relative;
 
@@ -714,11 +354,8 @@ body {
 
     border: 1px solid var(--complaint-border);
 
-    background: var(--complaint-primary);
+    border-radius: 9px;
 
-<<<<<<< HEAD
-    border-radius: 10px;
-=======
     background: #fafbfc;
 
     color: var(--complaint-text);
@@ -826,182 +463,16 @@ body {
     color: #737c8d;
 
     border-bottom: 1px solid var(--complaint-border);
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
-
-    font-size: 13px;
-
-<<<<<<< HEAD
-    font-weight: 600;
-
-    text-decoration: none;
-
-    box-shadow:
-        0 7px 18px rgba(37, 99, 235, 0.18);
-
-    transition:
-        transform 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease;
-}
-
-.btn-new-complaint:hover {
-    color: #ffffff !important;
-
-    background: var(--complaint-primary-dark);
-
-    transform: translateY(-1px);
-
-    box-shadow:
-        0 10px 22px rgba(37, 99, 235, 0.25);
-}
-
-
-/* =========================================================
-   PLUS ICON
-   ========================================================= */
-
-.btn-new-complaint .plus {
-    width: 19px;
-    height: 19px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    background: rgba(255, 255, 255, 0.16);
-
-    border-radius: 5px;
-
-    font-size: 15px;
-
-    line-height: 1;
-}
-
-
-/* =========================================================
-   TABLE CARD
-   ========================================================= */
-
-.complaint-card {
-    margin-top: 20px;
-
-    overflow: hidden;
-
-    background: var(--complaint-card);
-
-    border: 1px solid var(--complaint-border);
-
-    border-radius: var(--complaint-radius);
-
-    box-shadow:
-        0 3px 15px rgba(25, 35, 60, 0.035);
-}
-
-
-/* =========================================================
-   CARD HEADER
-   Optional: gunakan jika HTML memiliki header card
-   ========================================================= */
-
-.complaint-card-header {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 20px;
-
-    padding: 22px 24px;
-
-    border-bottom: 1px solid var(--complaint-border);
-}
-
-.complaint-card-header h3 {
-    margin: 0;
-
-    color: var(--complaint-text);
-
-    font-size: 17px;
-
-    font-weight: 700;
-}
-
-.complaint-card-header p {
-    margin: 4px 0 0;
-
-    color: var(--complaint-muted);
-
-    font-size: 12px;
-}
-
-
-/* =========================================================
-   TABLE WRAPPER
-   ========================================================= */
-
-.table-responsive {
-    width: 100%;
-
-    overflow-x: auto;
-
-    -webkit-overflow-scrolling: touch;
-}
-
-
-/* =========================================================
-   TABLE
-   ========================================================= */
-
-.complaint-table {
-    width: 100%;
-
-    min-width: 720px;
-
-    margin: 0 !important;
-
-    border-collapse: collapse;
-
-    border-spacing: 0;
-}
-
-
-/* =========================================================
-   TABLE HEADER
-   ========================================================= */
-
-.complaint-table thead {
-    background: #fafbfc;
-}
-
-.complaint-table thead th {
-    padding: 13px 17px;
-
-    color: #737c8d;
-
-    border: none;
-
-    border-bottom: 1px solid var(--complaint-border);
 
     font-size: 11px;
 
     font-weight: 700;
 
-    letter-spacing: 0.4px;
-
-=======
-    font-weight: 700;
-
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     text-transform: uppercase;
 
     letter-spacing: 0.4px;
 
     white-space: nowrap;
-<<<<<<< HEAD
-=======
 }
 
 
@@ -1073,63 +544,6 @@ body {
     color: var(--complaint-text);
 
     font-size: 13px;
-
-    font-weight: 650;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-}
-
-
-.subject-cell small {
-
-    display: block;
-
-    margin-top: 3px;
-
-    color: #9aa2b1;
-
-    font-size: 10px;
-}
-
-
-/* =========================================================
-   CUSTOMER
-   ========================================================= */
-
-.customer-cell {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 10px;
-}
-
-
-.customer-avatar {
-
-    width: 34px;
-
-    height: 34px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-
-    background: #eef4ff;
-
-    color: var(--complaint-primary);
-
-    font-size: 12px;
-
     font-weight: 700;
 }
 
@@ -1197,7 +611,6 @@ body {
     border-radius: 999px;
 
     font-size: 11px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 
     font-weight: 650;
 }
@@ -1353,18 +766,10 @@ body {
 
     text-decoration: none;
 
-    font-size: 13px;
-
     transition:
-        background 0.2s ease,
-        color 0.2s ease,
-        transform 0.15s ease;
-}
-
-
-.action-btn:hover {
-
-    transform: translateY(-1px);
+        transform .2s ease,
+        box-shadow .2s ease,
+        filter .2s ease;
 }
 
 
@@ -1430,240 +835,20 @@ body {
 }
 
 
-<<<<<<< HEAD
-/* =========================================================
-   TABLE BODY
-   ========================================================= */
-
-.complaint-table tbody td {
-    padding: 15px 17px;
-
-    color: #4e5768;
-
-    border: none;
-
-    border-bottom: 1px solid #f0f2f6;
-
-    font-size: 13px;
-
-    vertical-align: middle;
-
-    white-space: nowrap;
-}
-
-
-/* =========================================================
-   TABLE ROW
-   ========================================================= */
-
-.complaint-table tbody tr {
-    transition:
-        background 0.15s ease;
-}
-
-.complaint-table tbody tr:hover {
-    background: #fafcff;
-}
-=======
 .empty-state > div,
 .empty-state > strong,
 .empty-state > span {
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 
     display: block;
 }
 
 
-<<<<<<< HEAD
-/* =========================================================
-   CUSTOMER CODE
-   ========================================================= */
-
-.customer-code {
-    display: inline-flex;
-
-    align-items: center;
-
-    padding: 5px 9px;
-
-    color: var(--complaint-primary);
-
-    background: var(--complaint-primary-soft);
-
-    border-radius: 7px;
-
-    font-size: 11px;
-
-    font-weight: 700;
-
-    letter-spacing: 0.2px;
-}
-
-
-/* =========================================================
-   SUBJECT
-   ========================================================= */
-
-.subject {
-    color: var(--complaint-text);
-
-    font-size: 13px;
-
-    font-weight: 650;
-}
-
-
-/* =========================================================
-   COMPLAINT BADGE
-   ========================================================= */
-
-.complaint-badge {
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    padding: 5px 9px;
-
-    border-radius: 999px;
-
-    font-size: 11px;
-
-    font-weight: 650;
-
-    white-space: nowrap;
-}
-
-
-/* =========================================================
-   PRIORITY
-   ========================================================= */
-
-.priority-badge {
-    color: #c16d00;
-
-    background: #fff7e8;
-}
-
-
-/* =========================================================
-   STATUS
-   ========================================================= */
-
-.status-badge {
-    color: var(--complaint-primary);
-
-    background: var(--complaint-primary-soft);
-}
-
-
-/* =========================================================
-   STATUS VARIANTS
-   ========================================================= */
-
-.status-pending {
-    color: #c16d00;
-
-    background: #fff7e8;
-}
-
-.status-process {
-    color: var(--complaint-primary);
-
-    background: var(--complaint-primary-soft);
-}
-
-.status-resolved {
-    color: #15803d;
-
-    background: #ecfdf3;
-}
-
-.status-rejected {
-    color: var(--complaint-red);
-
-    background: #fef2f2;
-}
-
-
-/* =========================================================
-   STATUS DOT
-   ========================================================= */
-
-.status-dot {
-    width: 6px;
-    height: 6px;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-
-    background: currentColor;
-}
-
-
-/* =========================================================
-   DATE
-   ========================================================= */
-
-.complaint-date {
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    color: #626b7c;
-
-    font-size: 12px;
-
-    white-space: nowrap;
-}
-
-.complaint-date i {
-    color: #8c95a5;
-
-    font-size: 12px;
-}
-
-
-/* =========================================================
-   EMPTY STATE
-   ========================================================= */
-
-.empty-state {
-    height: 260px;
-
-    text-align: center !important;
-
-    vertical-align: middle !important;
-}
-
-.empty-state > div,
-.empty-state > strong,
-.empty-state > span,
-.empty-state > p {
-    display: block;
-}
-
-
-/* =========================================================
-   EMPTY ICON
-   ========================================================= */
-
-.empty-icon {
-    width: 55px;
-    height: 55px;
-
-=======
 .empty-icon {
 
     width: 55px;
 
     height: 55px;
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     display: flex !important;
 
     align-items: center;
@@ -1682,36 +867,17 @@ body {
 }
 
 
-<<<<<<< HEAD
-/* =========================================================
-   EMPTY TITLE
-   ========================================================= */
-
-.empty-title {
-    margin: 0;
-
-=======
 .empty-state strong {
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     color: #475569;
 
     font-size: 14px;
 }
 
 
-<<<<<<< HEAD
-/* =========================================================
-   EMPTY DESCRIPTION
-   ========================================================= */
-
-.empty-description {
-    margin: 5px 0 0;
-=======
 .empty-state span {
 
     margin-top: 4px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 
     color: #9aa3b2;
 
@@ -1724,40 +890,6 @@ body {
    ========================================================= */
 
 .complaint-card-footer {
-<<<<<<< HEAD
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    padding: 14px 24px;
-
-    border-top: 1px solid var(--complaint-border);
-
-    color: #9aa2b1;
-
-    font-size: 11px;
-}
-
-.footer-info {
-    display: flex;
-
-    align-items: center;
-
-    gap: 6px;
-}
-
-
-/* =========================================================
-   TABLET
-   ========================================================= */
-
-@media (max-width: 1100px) {
-
-    .complaint-container {
-        padding: 24px;
-=======
 
     display: flex;
 
@@ -1801,34 +933,20 @@ body {
 
         grid-template-columns:
             repeat(2, minmax(0, 1fr));
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     }
 
 }
 
 
-<<<<<<< HEAD
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 768px) {
-
-    .complaint-container {
-=======
 @media (max-width: 768px) {
 
     .complaint-page {
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
         padding: 16px;
     }
 
 
     .complaint-header {
-<<<<<<< HEAD
-        min-height: auto;
-=======
 
         flex-direction: column;
     }
@@ -1861,9 +979,6 @@ body {
 
 
     .complaint-summary {
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
-
-        padding: 20px;
 
         align-items: flex-start;
 
@@ -1873,18 +988,6 @@ body {
     }
 
 
-<<<<<<< HEAD
-    .complaint-heading {
-        gap: 12px;
-    }
-
-
-    .complaint-icon {
-        width: 46px;
-        height: 46px;
-
-        min-width: 46px;
-=======
     .summary-label {
 
         align-self: flex-start;
@@ -1892,7 +995,6 @@ body {
 
 
     .complaint-card-header {
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
 
         align-items: stretch;
 
@@ -1900,22 +1002,6 @@ body {
     }
 
 
-<<<<<<< HEAD
-    .complaint-title {
-        font-size: 21px;
-    }
-
-
-    .complaint-subtitle {
-        font-size: 12px;
-    }
-
-
-    .btn-new-complaint {
-        padding: 10px 13px;
-
-        font-size: 12px;
-=======
     .table-tools {
 
         width: 100%;
@@ -1933,7 +1019,6 @@ body {
     .status-filter {
 
         width: 100%;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     }
 
 
@@ -1943,45 +1028,13 @@ body {
     }
 
 
-<<<<<<< HEAD
-    .complaint-table {
-        min-width: 720px;
-    }
-=======
     .complaint-card-footer {
 
-        align-items: flex-start;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
-
-        flex-direction: column;
-
-<<<<<<< HEAD
-    .complaint-table th,
-    .complaint-table td {
-        padding: 13px 15px;
-    }
-
-
-    .complaint-card-header {
-        align-items: flex-start;
-
-        flex-direction: column;
-
-        padding: 18px;
-    }
-
-
-    .complaint-card-footer {
         align-items: flex-start;
 
         flex-direction: column;
 
         gap: 7px;
-
-        padding: 14px 18px;
-=======
-        gap: 7px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     }
 
 }
@@ -1993,25 +1046,15 @@ body {
 
 @media (max-width: 480px) {
 
-<<<<<<< HEAD
-    .complaint-container {
-=======
     .complaint-page {
 
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
         padding: 12px;
     }
 
 
     .complaint-stat-card {
 
-<<<<<<< HEAD
-        align-items: stretch;
-
-        padding: 18px;
-=======
         padding: 16px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     }
 
 
@@ -2021,43 +1064,9 @@ body {
     }
 
 
-<<<<<<< HEAD
-    .complaint-icon {
-        width: 43px;
-        height: 43px;
-
-        min-width: 43px;
-
-        font-size: 19px;
-    }
-
-
-    .complaint-title {
-        font-size: 19px;
-    }
-
-
-    .complaint-subtitle {
-        font-size: 11px;
-    }
-
-
-    .complaint-header-action {
-        width: 100%;
-    }
-
-
-    .btn-new-complaint {
-        width: 100%;
-
-        padding: 10px 14px;
-
-        font-size: 12px;
-=======
     .complaint-summary {
 
         padding: 18px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     }
 
 
@@ -2067,57 +1076,6 @@ body {
     }
 
 
-<<<<<<< HEAD
-    .complaint-table thead th {
-        padding: 12px 14px;
-
-        font-size: 10px;
-    }
-
-
-    .complaint-table tbody td {
-        padding: 13px 14px;
-
-        font-size: 12px;
-    }
-
-
-    .complaint-card {
-        margin-top: 16px;
-    }
-
-}
-
-
-/* =========================================================
-   EXTRA SMALL MOBILE
-   ========================================================= */
-
-@media (max-width: 400px) {
-
-    .complaint-container {
-        padding: 10px;
-    }
-
-
-    .complaint-header {
-        padding: 16px;
-    }
-
-
-    .complaint-title {
-        font-size: 18px;
-    }
-
-
-    .complaint-subtitle {
-        font-size: 10px;
-    }
-
-
-    .complaint-table {
-        min-width: 680px;
-=======
     .complaint-table th,
     .complaint-table td {
 
@@ -2135,7 +1093,6 @@ body {
     .subject-cell strong {
 
         max-width: 240px;
->>>>>>> 12f55d7fe3e6269a51ed7762751d15345bfd72fa
     }
 
 }
