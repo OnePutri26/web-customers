@@ -1,0 +1,1098 @@
+/* =========================================================
+    COMPLAINT PAGE
+    ========================================================= */
+
+:root {
+    --complaint-primary: #2563eb;
+    --complaint-primary-dark: #1d4ed8;
+    --complaint-bg: #f6f8fc;
+    --complaint-card: #ffffff;
+    --complaint-text: #172033;
+    --complaint-text-soft: #334155;
+    --complaint-muted: #7b8497;
+    --complaint-border: #e8ebf2;
+    --complaint-green: #16a34a;
+    --complaint-orange: #ea8b00;
+    --complaint-red: #dc2626;
+
+    --complaint-purple: #7c3aed;
+
+    --complaint-radius: 16px;
+
+    --complaint-shadow:
+        0 4px 20px rgba(15, 23, 42, 0.06);
+
+    --complaint-shadow-hover:
+        0 10px 30px rgba(15, 23, 42, 0.10);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* BODY */
+
+body {
+
+    margin: 0;
+    background: var(--complaint-bg);
+
+    color: var(--complaint-text);
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+
+/* =========================================================
+   MAIN PAGE
+   ========================================================= */
+
+.complaint-page {
+
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.complaint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+.breadcrumb-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--complaint-muted);
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.complaint-header h1 {
+    margin: 0;
+    color: var(--complaint-text);
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 800;
+    letter-spacing: -.8px;
+    line-height: 1.15;
+}
+
+.complaint-header p {
+    max-width: 650px;
+    margin: 8px 0 0;
+    color: var(--complaint-muted);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* BUTTON */
+
+.btn-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 11px 17px;
+    color: #fff;
+    background: var(--complaint-primary);
+    border: 0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.btn-add:hover {
+    color: #fff;
+    background: var(--complaint-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, .2);
+}
+
+/* STATISTICS */
+
+.complaint-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.complaint-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    background: var(--complaint-card);
+    border: 1px solid var(--complaint-border);
+    border-radius: var(--complaint-radius);
+    box-shadow: 0 3px 15px rgba(25, 35, 60, .035);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.complaint-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(25, 35, 60, .07);
+}
+
+.complaint-stat-icon {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 13px;
+    font-size: 21px;
+}
+
+.complaint-stat-card .stat-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.complaint-stat-card .stat-content span {
+    color: var(--complaint-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.complaint-stat-card .stat-content strong {
+    margin-top: 3px;
+    color: var(--complaint-text);
+    font-size: 25px;
+    line-height: 1.2;
+    font-weight: 750;
+}
+
+.complaint-stat-card .stat-content small {
+    margin-top: 3px;
+    color: #a0a7b5;
+    font-size: 11px;
+}
+
+
+.summary-left span {
+
+    display: block;
+
+    color: var(--complaint-muted);
+
+    font-size: 13px;
+}
+
+
+.summary-left h2 {
+
+    margin: 3px 0 0;
+
+    color: var(--complaint-text);
+
+    font-size: 22px;
+
+    font-weight: 750;
+}
+
+
+.summary-label {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    color: var(--complaint-green);
+
+    font-size: 13px;
+
+    font-weight: 600;
+}
+
+
+.summary-label i {
+
+    font-size: 8px;
+}
+
+
+/* =========================================================
+   COMPLAINT CARD
+   ========================================================= */
+
+.complaint-card {
+
+    overflow: hidden;
+
+    background: var(--complaint-card);
+
+    border: 1px solid var(--complaint-border);
+
+    border-radius: var(--complaint-radius);
+
+    box-shadow:
+        0 3px 15px rgba(25, 35, 60, 0.035);
+}
+
+
+/* =========================================================
+   CARD HEADER
+   ========================================================= */
+
+.complaint-card-header {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding: 22px 24px;
+
+    border-bottom: 1px solid var(--complaint-border);
+}
+
+
+.complaint-card-header h3 {
+
+    margin: 0;
+
+    color: var(--complaint-text);
+
+    font-size: 17px;
+
+    font-weight: 700;
+}
+
+
+.complaint-card-header p {
+
+    margin: 4px 0 0;
+
+    color: var(--complaint-muted);
+
+    font-size: 12px;
+}
+
+
+/* =========================================================
+   TABLE TOOLS
+   ========================================================= */
+
+.table-tools {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
+.complaint-search {
+
+    position: relative;
+
+    width: 270px;
+}
+
+
+.complaint-search i {
+
+    position: absolute;
+
+    left: 13px;
+
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    color: #9ba3b2;
+
+    font-size: 14px;
+}
+
+
+.complaint-search input {
+
+    width: 100%;
+
+    height: 38px;
+
+    box-sizing: border-box;
+
+    padding:
+        0
+        13px
+        0
+        37px;
+
+    outline: none;
+
+    border: 1px solid var(--complaint-border);
+
+    border-radius: 9px;
+
+    background: #fafbfc;
+
+    color: var(--complaint-text);
+
+    font-size: 13px;
+
+    transition:
+        border 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.complaint-search input:focus {
+
+    background: white;
+
+    border-color: #93b4f8;
+
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+
+.complaint-search input::placeholder {
+
+    color: #a0a7b5;
+}
+
+
+/* =========================================================
+   STATUS FILTER
+   ========================================================= */
+
+.status-filter select {
+
+    height: 38px;
+
+    padding:
+        0
+        34px
+        0
+        12px;
+
+    outline: none;
+
+    border: 1px solid var(--complaint-border);
+
+    border-radius: 9px;
+
+    background-color: #fafbfc;
+
+    color: #4b5565;
+
+    font-size: 13px;
+
+    cursor: pointer;
+}
+
+
+.status-filter select:focus {
+
+    border-color: #93b4f8;
+
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+
+/* =========================================================
+   TABLE WRAPPER
+   ========================================================= */
+
+.table-wrapper {
+
+    width: 100%;
+
+    overflow-x: auto;
+}
+
+
+/* =========================================================
+   COMPLAINT TABLE
+   ========================================================= */
+
+.complaint-table {
+
+    width: 100%;
+
+    min-width: 1000px;
+
+    border-collapse: collapse;
+}
+
+
+.complaint-table thead {
+
+    background: #fafbfc;
+}
+
+
+.complaint-table th {
+
+    padding: 13px 17px;
+
+    color: #737c8d;
+
+    border-bottom: 1px solid var(--complaint-border);
+
+    font-size: 11px;
+
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.4px;
+
+    white-space: nowrap;
+}
+
+
+.complaint-table td {
+
+    padding: 15px 17px;
+
+    border-bottom: 1px solid #f0f2f6;
+
+    color: #4e5768;
+
+    font-size: 13px;
+
+    white-space: nowrap;
+}
+
+
+.complaint-table tbody tr {
+
+    transition:
+        background 0.15s ease;
+}
+
+
+.complaint-table tbody tr:hover {
+
+    background: #fafcff;
+}
+
+
+.complaint-table tbody tr:last-child td {
+
+    border-bottom: none;
+}
+
+
+/* =========================================================
+   COMPLAINT CODE
+   ========================================================= */
+
+.complaint-code {
+
+    color: var(--complaint-primary);
+
+    font-size: 13px;
+
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   SUBJECT
+   ========================================================= */
+
+.subject-cell {
+
+    max-width: 320px;
+}
+
+
+.subject-cell strong {
+
+    display: block;
+
+    max-width: 320px;
+
+    overflow: hidden;
+
+    color: var(--complaint-text);
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+.customer-cell strong {
+
+    display: block;
+
+    color: var(--complaint-text);
+
+    font-size: 13px;
+
+    font-weight: 650;
+}
+
+
+.customer-cell small {
+
+    display: block;
+
+    margin-top: 2px;
+
+    color: #9aa2b1;
+
+    font-size: 10px;
+}
+
+
+/* =========================================================
+   DATE
+   ========================================================= */
+
+.complaint-date {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    color: #626b7c;
+}
+
+
+.complaint-date i {
+
+    color: #8c95a5;
+}
+
+
+/* =========================================================
+   PRIORITY BADGE
+   ========================================================= */
+
+.priority-badge {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    padding: 5px 9px;
+
+    border-radius: 999px;
+
+    font-size: 11px;
+
+    font-weight: 650;
+}
+
+
+.priority-dot {
+
+    width: 6px;
+
+    height: 6px;
+
+    border-radius: 50%;
+
+    background: currentColor;
+}
+
+
+.priority-high {
+
+    color: #dc2626;
+
+    background: #fef2f2;
+}
+
+
+.priority-medium {
+
+    color: #c16d00;
+
+    background: #fff7e8;
+}
+
+
+.priority-low {
+
+    color: #2563eb;
+
+    background: #eff6ff;
+}
+
+
+.priority-normal {
+
+    color: #64748b;
+
+    background: #f1f5f9;
+}
+
+
+/* =========================================================
+   STATUS BADGE
+   ========================================================= */
+
+.status-badge {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    padding: 5px 9px;
+
+    border-radius: 999px;
+
+    font-size: 11px;
+
+    font-weight: 650;
+}
+
+
+.status-dot {
+
+    width: 6px;
+
+    height: 6px;
+
+    border-radius: 50%;
+
+    background: currentColor;
+}
+
+
+.status-open {
+
+    color: #2563eb;
+
+    background: #eff6ff;
+}
+
+
+.status-process {
+
+    color: #c16d00;
+
+    background: #fff7e8;
+}
+
+
+.status-closed {
+
+    color: #15803d;
+
+    background: #ecfdf3;
+}
+
+
+.status-rejected {
+
+    color: #dc2626;
+
+    background: #fef2f2;
+}
+
+
+.status-default {
+
+    color: #64748b;
+
+    background: #f1f5f9;
+}
+
+
+/* =========================================================
+   ACTION BUTTONS
+   ========================================================= */
+
+.action-buttons {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+}
+
+
+.action-btn {
+
+    width: 31px;
+
+    height: 31px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 8px;
+
+    border: none;
+
+    text-decoration: none;
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        filter .2s ease;
+}
+
+
+.btn-view {
+
+    color: #64748b;
+
+    background: #f1f5f9;
+}
+
+
+.btn-view:hover {
+
+    color: #334155;
+
+    background: #e2e8f0;
+}
+
+
+.btn-edit {
+
+    color: #2563eb;
+
+    background: #eff6ff;
+}
+
+
+.btn-edit:hover {
+
+    color: #1d4ed8;
+
+    background: #dbeafe;
+}
+
+
+.btn-delete {
+
+    color: #dc2626;
+
+    background: #fef2f2;
+}
+
+
+.btn-delete:hover {
+
+    color: #b91c1c;
+
+    background: #fee2e2;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+   ========================================================= */
+
+.empty-state {
+
+    height: 260px;
+
+    text-align: center !important;
+
+    vertical-align: middle;
+}
+
+
+.empty-state > div,
+.empty-state > strong,
+.empty-state > span {
+
+    display: block;
+}
+
+
+.empty-icon {
+
+    width: 55px;
+
+    height: 55px;
+
+    display: flex !important;
+
+    align-items: center;
+
+    justify-content: center;
+
+    margin: 0 auto 12px;
+
+    border-radius: 14px;
+
+    background: #f1f5f9;
+
+    color: #94a3b8;
+
+    font-size: 23px;
+}
+
+
+.empty-state strong {
+
+    color: #475569;
+
+    font-size: 14px;
+}
+
+
+.empty-state span {
+
+    margin-top: 4px;
+
+    color: #9aa3b2;
+
+    font-size: 12px;
+}
+
+
+/* =========================================================
+   CARD FOOTER
+   ========================================================= */
+
+.complaint-card-footer {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 14px 24px;
+
+    border-top: 1px solid var(--complaint-border);
+
+    color: #9aa2b1;
+
+    font-size: 11px;
+}
+
+
+.footer-info {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+    .complaint-page {
+
+        padding: 24px;
+    }
+
+
+    .complaint-stat-grid {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+}
+
+
+@media (max-width: 768px) {
+
+    .complaint-page {
+
+        padding: 16px;
+    }
+
+
+    .complaint-header {
+
+        flex-direction: column;
+    }
+
+
+    .complaint-header h1 {
+
+        font-size: 24px;
+    }
+
+
+    .header-actions {
+
+        width: 100%;
+    }
+
+
+    .btn-add {
+
+        width: 100%;
+
+        justify-content: center;
+    }
+
+
+    .complaint-stat-grid {
+
+        grid-template-columns: 1fr;
+    }
+
+
+    .complaint-summary {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+
+        gap: 14px;
+    }
+
+
+    .summary-label {
+
+        align-self: flex-start;
+    }
+
+
+    .complaint-card-header {
+
+        align-items: stretch;
+
+        flex-direction: column;
+    }
+
+
+    .table-tools {
+
+        width: 100%;
+
+        flex-direction: column;
+    }
+
+
+    .complaint-search {
+
+        width: 100%;
+    }
+
+
+    .status-filter {
+
+        width: 100%;
+    }
+
+
+    .status-filter select {
+
+        width: 100%;
+    }
+
+
+    .complaint-card-footer {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+
+        gap: 7px;
+    }
+
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+    .complaint-page {
+
+        padding: 12px;
+    }
+
+
+    .complaint-stat-card {
+
+        padding: 16px;
+    }
+
+
+    .stat-content strong {
+
+        font-size: 21px;
+    }
+
+
+    .complaint-summary {
+
+        padding: 18px;
+    }
+
+
+    .complaint-card-header {
+
+        padding: 18px;
+    }
+
+
+    .complaint-table th,
+    .complaint-table td {
+
+        padding:
+            12px 14px;
+    }
+
+
+    .subject-cell {
+
+        max-width: 240px;
+    }
+
+
+    .subject-cell strong {
+
+        max-width: 240px;
+    }
+
+}
