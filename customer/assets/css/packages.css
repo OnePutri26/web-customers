@@ -1,0 +1,127 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f5f7fb;
+    color: #1f2937;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 50px 25px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.header h1 {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.header p {
+    color: #6b7280;
+}
+
+.packages {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 25px;
+}
+
+.package-card {
+    background: white;
+    border-radius: 18px;
+    padding: 30px 25px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0,0,0,.07);
+    transition: .2s;
+}
+
+.package-card:hover {
+    transform: translateY(-5px);
+}
+
+.package-icon {
+    font-size: 35px;
+    margin-bottom: 15px;
+}
+
+.package-card h2 {
+    margin-bottom: 10px;
+}
+
+.speed {
+    font-size: 22px;
+    font-weight: bold;
+    color: #2563eb;
+    margin-bottom: 15px;
+}
+
+.price {
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.price span {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: normal;
+}
+
+.package-card p {
+    color: #6b7280;
+    line-height: 1.6;
+    min-height: 50px;
+    margin-bottom: 25px;
+}
+
+button {
+    width: 100%;
+    border: none;
+    padding: 13px;
+    border-radius: 10px;
+    background: #2563eb;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1d4ed8;
+}
+
+/* PROFILE-STYLE PACKAGES */
+.packages-page { min-height: 100vh; background: #f5f7fb; color: #172033; }
+.packages-navbar { height: 78px; padding: 0 7%; display: flex; align-items: center; gap: 15px; background: #fff; border-bottom: 1px solid #e9edf3; }
+.back-dashboard { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 11px; color: #2563eb; background: #eff6ff; font-size: 17px; text-decoration: none; transition: .2s ease; }
+.back-dashboard:hover { color: #fff; background: #2563eb; }
+.nav-title { flex: 1; }
+.nav-title strong, .nav-title span { display: block; }
+.nav-title strong { color: #111827; font-size: 17px; }
+.nav-title span { margin-top: 3px; color: #9ca3af; font-size: 12px; }
+.dashboard-link { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; color: #475569; background: #f8fafc; font-size: 13px; font-weight: 600; text-decoration: none; }
+.dashboard-link:hover { color: #fff; background: #2563eb; }
+.packages-page .container { max-width: 1120px; padding: 34px 24px 55px; }
+.packages-page .header { margin-bottom: 30px; text-align: left; }
+.packages-page .eyebrow { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 7px; color: #2563eb; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; }
+.packages-page .header h1 { margin-bottom: 7px; color: #172033; font-size: 30px; font-weight: 800; letter-spacing: -.7px; }
+.packages-page .header p { color: #667085; font-size: 13px; }
+.packages-page .packages { gap: 18px; }
+.packages-page .package-card { position: relative; padding: 27px 23px 23px; border: 1px solid #e8ebf2; border-radius: 16px; box-shadow: 0 5px 20px rgba(15,23,42,.06); text-align: left; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.packages-page .package-card:hover { border-color: #bfdbfe; box-shadow: 0 14px 30px rgba(37,99,235,.13); transform: translateY(-5px); }
+.packages-page .package-icon { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-bottom: 19px; border-radius: 14px; color: #2563eb; background: #eff6ff; font-size: 22px; }
+.packages-page .package-card h2 { margin-bottom: 8px; color: #172033; font-size: 18px; font-weight: 800; }
+.packages-page .speed { margin-bottom: 13px; color: #2563eb; font-size: 19px; }
+.packages-page .price { margin-bottom: 13px; color: #172033; font-size: 21px; }
+.packages-page .package-card p { min-height: 60px; margin-bottom: 21px; color: #667085; font-size: 12px; line-height: 1.65; }
+.packages-page button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 14px; border-radius: 10px; font-size: 12px; }
+@media (max-width: 600px) { .packages-navbar { padding: 0 18px; } .dashboard-link { padding: 10px; font-size: 0; } .dashboard-link i { font-size: 16px; } .packages-page .container { padding: 22px 15px 40px; } .packages-page .header h1 { font-size: 24px; } }

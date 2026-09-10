@@ -1,4 +1,3 @@
-```php
 <?php
 
 require_once "../config/database.php";
@@ -1432,4 +1431,4 @@ startButton.addEventListener(
 </body>
 
 </html>
-```
+

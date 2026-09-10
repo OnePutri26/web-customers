@@ -7,6 +7,42 @@ requireRole('customer');
 
 $userId = $_SESSION['user_id'];
 
+/* Dashboard hanya boleh dibuka oleh customer dengan subscription aktif. */
+$accessStmt = $conn->prepare(
+    "SELECT status, tgl_berakhir
+     FROM subscriptions
+     WHERE id_user = ?
+     ORDER BY id DESC
+     LIMIT 1"
+);
+
+if (!$accessStmt) {
+    die("Validasi subscription gagal.");
+}
+
+$accessStmt->bind_param("i", $userId);
+$accessStmt->execute();
+$accessSubscription = $accessStmt->get_result()->fetch_assoc();
+$accessStmt->close();
+
+if (!$accessSubscription) {
+    header("Location: subscription.php");
+    exit;
+}
+
+$expiredByDate = !empty($accessSubscription['tgl_berakhir'])
+    && strtotime($accessSubscription['tgl_berakhir']) < time();
+
+if ($accessSubscription['status'] === 'expired' || $expiredByDate) {
+    header("Location: renewal.php");
+    exit;
+}
+
+if ($accessSubscription['status'] !== 'active') {
+    header("Location: subscription.php");
+    exit;
+}
+
 
 /* =====================================================
    DATA CUSTOMER
@@ -70,6 +106,33 @@ $stmt->execute();
 
 $totalComplaint =
     $stmt->get_result()->fetch_assoc()['total'] ?? 0;
+
+/* =====================================================
+   TOTAL NOTIFIKASI BELUM DIBACA
+===================================================== */
+
+$totalNotification = 0;
+
+try {
+
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM notifications
+        WHERE (id_user = ? OR id_user IS NULL)
+        AND dibaca = 0
+    ");
+
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+
+    $totalNotification =
+        $stmt->get_result()->fetch_assoc()['total'] ?? 0;
+
+} catch (Exception $e) {
+
+    $totalNotification = 0;
+
+}
 
 
 /* =====================================================
@@ -477,19 +540,19 @@ $tanggalJatuhTempo =
 
     <div class="topbar-right">
 
-        <div class="notification">
+        <a href="notifikasi.php" class="notification" aria-label="Buka notifikasi">
 
             <i class="bi bi-bell"></i>
 
-            <?php if ($totalComplaint > 0): ?>
+            <?php if ($totalNotification > 0): ?>
 
                 <span class="notification-badge">
-                    <?= $totalComplaint ?>
+                    <?= $totalNotification ?>
                 </span>
 
             <?php endif; ?>
 
-        </div>
+        </a>
 
 
         <a
@@ -1514,7 +1577,7 @@ if (chartElement) {
     ];
 
 
-    new Chart(chartElement, {
+    new window.Chart(chartElement, {
 
         type: 'line',
 

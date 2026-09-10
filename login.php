@@ -18,8 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
 
         /*
-         * Ambil user berdasarkan username
+         * ==========================================================
+         * AMBIL DATA USER
+         * ==========================================================
          */
+
         $stmt = $conn->prepare("
             SELECT id, username, password, role
             FROM users
@@ -43,38 +46,178 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $result->fetch_assoc();
 
                 /*
-                 * Cek password
+                 * ==================================================
+                 * CEK PASSWORD
+                 * ==================================================
                  */
+
                 if (password_verify($password, $user['password'])) {
 
                     /*
-                     * Buat session
+                     * ==================================================
+                     * AMANKAN SESSION
+                     * ==================================================
                      */
+
                     session_regenerate_id(true);
 
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['username'] = $user['username'];
                     $_SESSION['role'] = $user['role'];
 
+
                     /*
-                     * Redirect berdasarkan role
+                     * ==================================================
+                     * REDIRECT BERDASARKAN ROLE
+                     * ==================================================
                      */
+
                     if ($user['role'] === 'admin') {
 
                         header("Location: admin/dashboard.php");
                         exit;
+
 
                     } elseif ($user['role'] === 'technician') {
 
                         header("Location: technician/dashboard.php");
                         exit;
 
+
                     } elseif ($user['role'] === 'customer') {
 
-                        header("Location: customer/dashboard.php");
-                        exit;
+                        /*
+                         * ==================================================
+                         * CUSTOMER
+                         *
+                         * Cek apakah customer sudah memiliki subscription
+                         * ==================================================
+                         */
+
+                        $userId = $user['id'];
+
+                        $stmtSub = $conn->prepare("
+                            SELECT id, status, tgl_berakhir
+                            FROM subscriptions
+                            WHERE id_user = ?
+                            ORDER BY id DESC
+                            LIMIT 1
+                        ");
+
+                        /*
+                         * Jika tabel subscriptions belum tersedia
+                         */
+                        if (!$stmtSub) {
+
+                            $error = "Tabel langganan belum tersedia. Silakan hubungi administrator.";
+
+                        } else {
+
+                            $stmtSub->bind_param("i", $userId);
+                            $stmtSub->execute();
+
+                            $resultSub = $stmtSub->get_result();
+
+                            $subscription = $resultSub->fetch_assoc();
+
+                            /*
+                             * ==================================================
+                             * BELUM PERNAH BERLANGGANAN
+                             * ==================================================
+                             */
+
+                            if (!$subscription) {
+
+                                header("Location: customer/subscription.php");
+                                exit;
+                            }
+
+
+                            /*
+                             * ==================================================
+                             * SUDAH MEMILIKI DATA LANGGANAN
+                             * ==================================================
+                             */
+
+                            $subscriptionStatus = $subscription['status'];
+                            $isExpiredByDate = !empty($subscription['tgl_berakhir'])
+                                && strtotime($subscription['tgl_berakhir']) < time();
+
+                            if ($isExpiredByDate && $subscriptionStatus === 'active') {
+                                $subscriptionStatus = 'expired';
+                            }
+
+                            switch ($subscriptionStatus) {
+
+
+                                /*
+                                 * ----------------------------------------------
+                                 * LANGGANAN AKTIF
+                                 * ----------------------------------------------
+                                 */
+
+                                case 'active':
+
+                                    header("Location: customer/dashboard.php");
+                                    exit;
+
+
+                                /*
+                                 * ----------------------------------------------
+                                 * MASIH DALAM PROSES
+                                 * ----------------------------------------------
+                                 */
+
+                                case 'pending':
+
+                                case 'approved':
+
+                                case 'installation':
+
+                                    header("Location: customer/subscription.php");
+                                    exit;
+
+
+                                /*
+                                 * ----------------------------------------------
+                                 * SUSPENDED / EXPIRED
+                                 * ----------------------------------------------
+                                 */
+
+                                case 'expired':
+
+                                    header("Location: customer/renewal.php");
+                                    exit;
+
+                                case 'suspended':
+
+                                    header("Location: customer/subscription.php");
+                                    exit;
+
+
+                                /*
+                                 * ----------------------------------------------
+                                 * STATUS TIDAK DIKENALI
+                                 * ----------------------------------------------
+                                 */
+
+                                default:
+
+                                    header("Location: customer/installation_status.php");
+                                    exit;
+                            }
+
+                            $stmtSub->close();
+                        }
+
 
                     } else {
+
+                        /*
+                         * ==================================================
+                         * ROLE TIDAK DIKENALI
+                         * ==================================================
+                         */
 
                         $error = "Role akun tidak dikenali.";
                     }
@@ -82,13 +225,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
 
                     $error = "Username atau password salah.";
-
                 }
 
             } else {
 
                 $error = "Username atau password salah.";
-
             }
 
             $stmt->close();
@@ -145,19 +286,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="login-container">
 
-            <!-- LEFT SIDE -->
+
+            <!-- ======================================================
+                 LEFT SIDE
+                 ====================================================== -->
+
             <div class="login-info">
 
 
                 <div class="wifi-icon">
-                    <img src="logo-yesnet.png" alt="Logo WiFi">
+
+                    <img
+                        src="logo-yesnet.png"
+                        alt="Logo WiFi"
+                    >
+
                 </div>
 
 
                 <h1>
 
                     WiFi<br>
-                    <span>Management</span>
+
+                    <span>
+                        Management
+                    </span>
+
                 </h1>
 
 
@@ -213,10 +367,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 </div>
 
+
             </div>
 
 
-            <!-- RIGHT SIDE -->
+            <!-- ======================================================
+                 RIGHT SIDE
+                 ====================================================== -->
+
             <div class="login-card">
 
 
@@ -233,7 +391,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
 
-        <?php if (!empty($error)): ?>
+                <!-- ERROR -->
+
+                <?php if (!empty($error)): ?>
 
                     <div class="alert alert-danger mb-4">
 
@@ -241,15 +401,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     </div>
 
-        <?php endif; ?>
+                <?php endif; ?>
 
 
+                <!-- ==================================================
+                     LOGIN FORM
+                     ================================================== -->
 
-                <!-- LOGIN FORM -->
+                <form
+                    method="POST"
+                    action=""
+                >
 
-                <form method="POST" action="">
 
-                    <!-- Username -->
+                    <!-- USERNAME -->
 
                     <div class="mb-3">
 
@@ -284,7 +449,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                     </div>
-
 
 
                     <!-- PASSWORD -->
@@ -323,7 +487,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
 
-
                     <!-- LOGIN BUTTON -->
 
                     <button
@@ -339,7 +502,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </form>
 
 
-
                 <!-- REGISTER -->
 
                 <div class="register-text">
@@ -351,7 +513,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </a>
 
                 </div>
-
 
 
                 <!-- SECURITY -->

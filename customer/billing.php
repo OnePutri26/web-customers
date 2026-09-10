@@ -7,11 +7,6 @@ requireRole('customer');
 
 $userId = $_SESSION['user_id'];
 
-
-/* =====================================================
-   DATA CUSTOMER
-===================================================== */
-
 $stmt = $conn->prepare("
     SELECT *
     FROM customers
@@ -36,11 +31,6 @@ $initial = strtoupper(
     substr(trim($nama), 0, 1)
 );
 
-
-/* =====================================================
-   DATA PAKET
-===================================================== */
-
 $paketNama =
     $customer['paket'] ??
     $customer['nama_paket'] ??
@@ -50,11 +40,6 @@ $paketSpeed =
     $customer['speed'] ??
     $customer['kecepatan'] ??
     '100 Mbps';
-
-
-/* =====================================================
-   TAGIHAN AKTIF
-===================================================== */
 
 $tagihan = null;
 
@@ -81,11 +66,6 @@ try {
     $tagihan = null;
 
 }
-
-
-/* =====================================================
-   RIWAYAT PEMBAYARAN
-===================================================== */
 
 $payments = [];
 
@@ -116,11 +96,6 @@ try {
 
 }
 
-
-/* =====================================================
-   DATA TAGIHAN
-===================================================== */
-
 $jumlahTagihan =
     $tagihan['jumlah'] ??
     $tagihan['amount'] ??
@@ -140,11 +115,6 @@ $statusTagihan =
         $tagihan['status'] ?? 'unpaid'
     );
 
-
-/* =====================================================
-   FORMAT RUPIAH
-===================================================== */
-
 function rupiah($angka)
 {
     return 'Rp ' . number_format(
@@ -154,11 +124,6 @@ function rupiah($angka)
         '.'
     );
 }
-
-
-/* =====================================================
-   FORMAT STATUS
-===================================================== */
 
 $statusLabel = match ($statusTagihan) {
 
@@ -191,14 +156,12 @@ $statusLabel = match ($statusTagihan) {
         Tagihan - Customer Portal
     </title>
 
-
     <!-- Bootstrap -->
 
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
         rel="stylesheet"
     >
-
 
     <!-- Bootstrap Icons -->
 
@@ -601,11 +564,6 @@ $statusLabel = match ($statusTagihan) {
 
 <body>
 
-
-<!-- =====================================================
-     SIDEBAR
-===================================================== -->
-
 <aside class="sidebar">
 
     <div class="sidebar-logo">
@@ -632,11 +590,9 @@ $statusLabel = match ($statusTagihan) {
 
 
     <div class="sidebar-menu">
-
         <p class="menu-title">
             MENU
         </p>
-
 
         <a
             href="dashboard.php"
@@ -825,18 +781,7 @@ $statusLabel = match ($statusTagihan) {
 
 </aside>
 
-
-
-<!-- =====================================================
-     MAIN CONTENT
-===================================================== -->
-
 <main class="main-content">
-
-
-<!-- =====================================================
-     TOPBAR
-===================================================== -->
 
 <header class="topbar">
 
@@ -884,18 +829,7 @@ $statusLabel = match ($statusTagihan) {
 
 </header>
 
-
-
-<!-- =====================================================
-     CONTENT
-===================================================== -->
-
 <div class="content">
-
-
-<!-- =====================================================
-     PAGE HEADER
-===================================================== -->
 
 <div class="mb-4">
 
@@ -924,12 +858,6 @@ $statusLabel = match ($statusTagihan) {
     </p>
 
 </div>
-
-
-
-<!-- =====================================================
-     TAGIHAN AKTIF
-===================================================== -->
 
 <div class="row g-4 mb-4">
 
@@ -1194,12 +1122,6 @@ $statusLabel = match ($statusTagihan) {
 
 </div>
 
-
-
-<!-- =====================================================
-     RIWAYAT PEMBAYARAN
-===================================================== -->
-
 <div class="billing-page-card">
 
     <div
@@ -1454,12 +1376,6 @@ $statusLabel = match ($statusTagihan) {
     </div>
 
 </div>
-
-
-
-<!-- =====================================================
-     PAYMENT INFO
-===================================================== -->
 
 <div class="row g-4 mt-1">
 
