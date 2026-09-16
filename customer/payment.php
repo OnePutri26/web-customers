@@ -1,177 +1,1632 @@
 <?php
 
+session_start();
+
 require_once "../config/database.php";
 require_once "../config/auth.php";
+require_once "../config/midtrans.php";
 
 requireRole('customer');
 
-$userId = (int) $_SESSION['user_id'];
-$packageId = (int) ($_POST['package_id'] ?? $_GET['package_id'] ?? 0);
-$isRenewal = (int) ($_POST['renewal'] ?? $_GET['renewal'] ?? 0) === 1;
+date_default_timezone_set('Asia/Jakarta');
+
+mysqli_report(
+    MYSQLI_REPORT_ERROR |
+    MYSQLI_REPORT_STRICT
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
+
+function e($value): string
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+
+function rupiah($value): string
+{
+    return 'Rp ' . number_format(
+        (float) $value,
+        0,
+        ',',
+        '.'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN
+|--------------------------------------------------------------------------
+*/
+
+$userId = (int) (
+    $_SESSION['user_id'] ?? 0
+);
+
+
+if ($userId <= 0) {
+
+    header("Location: ../login.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VARIABEL
+|--------------------------------------------------------------------------
+*/
+
+$error = '';
+
+$customer = null;
+$package = null;
+
+$customerId = 0;
+$packageId = 0;
+
+$snapToken = null;
+$orderId = null;
+
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL CUSTOMER
+|--------------------------------------------------------------------------
+*/
+
+$stmt = $conn->prepare("
+    SELECT
+        id,
+        user_id,
+        paket_id,
+        nama,
+        telephone,
+        email,
+        nik,
+        alamat,
+        status_langganan
+    FROM customers
+    WHERE user_id = ?
+    LIMIT 1
+");
+
+$stmt->bind_param(
+    "i",
+    $userId
+);
+
+$stmt->execute();
+
+$result = $stmt->get_result();
+
+$customer = $result->fetch_assoc();
+
+$stmt->close();
+
+
+if (!$customer) {
+
+    die(
+        "<div style='font-family:Arial;padding:30px'>" .
+        "<h2>Data customer tidak ditemukan</h2>" .
+        "</div>"
+    );
+}
+
+
+$customerId = (int) $customer['id'];
+
+
+if ($customerId <= 0) {
+
+    die(
+        "<div style='font-family:Arial;padding:30px'>" .
+        "<h2>ID customer tidak valid</h2>" .
+        "</div>"
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CEK STATUS CUSTOMER
+|--------------------------------------------------------------------------
+|
+| Jangan biarkan customer yang sudah aktif membuat transaksi instalasi
+| baru dari halaman ini.
+|
+*/
+
+$statusLangganan = strtolower(
+    trim(
+        (string) (
+            $customer['status_langganan'] ?? ''
+        )
+    )
+);
+
+
+if (
+    $statusLangganan === 'active' ||
+    $statusLangganan === 'aktif' ||
+    $statusLangganan === '3'
+) {
+
+    header("Location: dashboard.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TENTUKAN PAKET
+|--------------------------------------------------------------------------
+*/
+
+if (
+    isset($_POST['paket_id']) &&
+    (int) $_POST['paket_id'] > 0
+) {
+
+    $packageId = (int) $_POST['paket_id'];
+
+} elseif (
+    isset($_GET['paket_id']) &&
+    (int) $_GET['paket_id'] > 0
+) {
+
+    $packageId = (int) $_GET['paket_id'];
+
+} elseif (
+    isset($_SESSION['pengajuan_paket_id']) &&
+    (int) $_SESSION['pengajuan_paket_id'] > 0
+) {
+
+    $packageId =
+        (int) $_SESSION['pengajuan_paket_id'];
+
+} elseif (
+    isset($customer['paket_id']) &&
+    (int) $customer['paket_id'] > 0
+) {
+
+    $packageId =
+        (int) $customer['paket_id'];
+}
+
 
 if ($packageId <= 0) {
+
     header("Location: packages.php");
     exit;
 }
 
-$packageStmt = $conn->prepare(
-    "SELECT id, nama_paket, kecepatan, harga, deskripsi
-     FROM packages
-     WHERE id = ? AND status = 'aktif'
-     LIMIT 1"
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL PAKET
+|--------------------------------------------------------------------------
+*/
+
+$stmt = $conn->prepare("
+    SELECT
+        id,
+        nama_paket,
+        speed_mbps,
+        harga,
+        deskripsi,
+        status
+    FROM paket_wifi
+    WHERE id = ?
+    LIMIT 1
+");
+
+$stmt->bind_param(
+    "i",
+    $packageId
 );
-$packageStmt->bind_param("i", $packageId);
-$packageStmt->execute();
-$package = $packageStmt->get_result()->fetch_assoc();
-$packageStmt->close();
+
+$stmt->execute();
+
+$result = $stmt->get_result();
+
+$package = $result->fetch_assoc();
+
+$stmt->close();
+
 
 if (!$package) {
-    http_response_code(404);
-    exit('Paket tidak ditemukan.');
+
+    die(
+        "<div style='font-family:Arial;padding:30px'>" .
+        "<h2>Paket WiFi tidak ditemukan</h2>" .
+        "</div>"
+    );
 }
 
-$error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
-    $method = trim($_POST['method'] ?? 'transfer_bank');
-    $allowedMethods = ['transfer_bank', 'e_wallet', 'virtual_account'];
+/*
+|--------------------------------------------------------------------------
+| DATA PAKET
+|--------------------------------------------------------------------------
+*/
 
-    if (!in_array($method, $allowedMethods, true)) {
-        $error = 'Metode pembayaran tidak valid.';
-    } else {
+$packageName = trim(
+    (string) (
+        $package['nama_paket'] ?? 'Paket WiFi'
+    )
+);
+
+$speed = (int) (
+    $package['speed_mbps'] ?? 0
+);
+
+$price = (float) (
+    $package['harga'] ?? 0
+);
+
+$description = trim(
+    (string) (
+        $package['deskripsi'] ?? ''
+    )
+);
+
+$packageStatus = strtolower(
+    trim(
+        (string) (
+            $package['status'] ?? ''
+        )
+    )
+);
+
+
+if (
+    $packageStatus !== 'active' &&
+    $packageStatus !== 'aktif'
+) {
+
+    die(
+        "<div style='font-family:Arial;padding:30px'>" .
+        "<h2>Paket tidak tersedia</h2>" .
+        "</div>"
+    );
+}
+
+
+if ($price <= 0) {
+
+    die(
+        "<div style='font-family:Arial;padding:30px'>" .
+        "<h2>Harga paket tidak valid</h2>" .
+        "</div>"
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER DISPLAY
+|--------------------------------------------------------------------------
+*/
+
+$customerName = trim(
+    (string) (
+        $customer['nama']
+        ??
+        $_SESSION['nama']
+        ??
+        $_SESSION['username']
+        ??
+        'Customer'
+    )
+);
+
+
+if ($customerName === '') {
+
+    $customerName = 'Customer';
+}
+
+
+$initial = strtoupper(
+    substr(
+        $customerName,
+        0,
+        1
+    )
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| PROSES PEMBAYARAN
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['confirm_payment'])
+) {
+
+    $method = trim(
+        (string) (
+            $_POST['method'] ?? ''
+        )
+    );
+
+    $postedPackageId = (int) (
+        $_POST['paket_id'] ?? 0
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI
+    |--------------------------------------------------------------------------
+    */
+
+    $allowedMethods = [
+        'transfer_bank',
+        'e_wallet',
+        'virtual_account'
+    ];
+
+
+    if ($postedPackageId <= 0) {
+
+        $error =
+            "Paket belum dipilih.";
+
+    } elseif (
+        $postedPackageId !== $packageId
+    ) {
+
+        $error =
+            "Paket pembayaran tidak valid.";
+
+    } elseif (
+        $method === ''
+    ) {
+
+        $error =
+            "Silakan pilih metode pembayaran.";
+
+    } elseif (
+        !in_array(
+            $method,
+            $allowedMethods,
+            true
+        )
+    ) {
+
+        $error =
+            "Metode pembayaran tidak valid.";
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | BUAT TRANSAKSI MIDTRANS
+    |--------------------------------------------------------------------------
+    */
+
+    if ($error === '') {
+
         try {
-            $conn->begin_transaction();
 
-            $existingStmt = $conn->prepare(
-                "SELECT id, status
-                 FROM subscriptions
-                 WHERE id_user = ?
-                 ORDER BY id DESC
-                 LIMIT 1
-                 FOR UPDATE"
+            /*
+            |--------------------------------------------------------------------------
+            | ORDER ID UNIK
+            |--------------------------------------------------------------------------
+            */
+
+            $orderId =
+                'WIFI-' .
+                $customerId .
+                '-' .
+                date('YmdHis') .
+                '-' .
+                random_int(1000, 9999);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DATA CUSTOMER
+            |--------------------------------------------------------------------------
+            */
+
+            $customerEmail = trim(
+                (string) (
+                    $customer['email'] ?? ''
+                )
             );
-            $existingStmt->bind_param("i", $userId);
-            $existingStmt->execute();
-            $existing = $existingStmt->get_result()->fetch_assoc();
-            $existingStmt->close();
 
-            if ($existing && $existing['status'] === 'active' && !$isRenewal) {
-                $conn->rollback();
-                header("Location: dashboard.php");
-                exit;
-            }
-
-            $subscriptionId = (int) ($existing['id'] ?? 0);
-            if ($subscriptionId > 0) {
-                $subscriptionStmt = $conn->prepare(
-                    "UPDATE subscriptions
-                     SET id_package = ?, status = 'active',
-                         tgl_pengajuan = NOW(), tgl_aktif = NOW(),
-                         tgl_berakhir = DATE_ADD(NOW(), INTERVAL 30 DAY)
-                     WHERE id = ?"
-                );
-                $subscriptionStmt->bind_param("ii", $packageId, $subscriptionId);
-            } else {
-                $subscriptionStmt = $conn->prepare(
-                    "INSERT INTO subscriptions
-                     (id_user, id_package, status, tgl_pengajuan, tgl_aktif, tgl_berakhir)
-                     VALUES (?, ?, 'active', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY))"
-                );
-                $subscriptionStmt->bind_param("ii", $userId, $packageId);
-            }
-            $subscriptionStmt->execute();
-            if ($subscriptionId === 0) {
-                $subscriptionId = $conn->insert_id;
-            }
-            $subscriptionStmt->close();
-
-            $customerStmt = $conn->prepare("SELECT id FROM customers WHERE user_id = ? LIMIT 1");
-            $customerStmt->bind_param("i", $userId);
-            $customerStmt->execute();
-            $customer = $customerStmt->get_result()->fetch_assoc();
-            $customerStmt->close();
-
-            if (!$customer) {
-                throw new RuntimeException('Data customer tidak ditemukan.');
-            }
-
-            $invoice = 'INV' . date('YmdHis') . random_int(10, 99);
-            $period = date('Y-m');
-            $customerId = (int) $customer['id'];
-            $amount = (float) $package['harga'];
-            $note = 'Pembayaran subscription #' . $subscriptionId;
-
-            $billingStmt = $conn->prepare(
-                "INSERT INTO billing
-                 (id_warga, invoice, period, jatuh_tempo, nominal, status, metode_pembayaran, tgl_bayar, catatan)
-                 VALUES (?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, 'lunas', ?, NOW(), ?)"
+            $customerPhone = trim(
+                (string) (
+                    $customer['telephone'] ?? ''
+                )
             );
-            $billingStmt->bind_param("issdss", $customerId, $invoice, $period, $amount, $method, $note);
-            $billingStmt->execute();
-            $billingStmt->close();
 
-            $conn->commit();
-            header("Location: dashboard.php?payment=success");
-            exit;
-        } catch (Throwable $exception) {
-            $conn->rollback();
-            $error = 'Pembayaran gagal diproses. Silakan coba lagi.';
+
+            /*
+            |--------------------------------------------------------------------------
+            | MIDTRANS PARAMETER
+            |--------------------------------------------------------------------------
+            */
+
+            $params = [
+
+                'transaction_details' => [
+
+                    'order_id' =>
+                        $orderId,
+
+                    'gross_amount' =>
+                        (int) $price
+                ],
+
+
+                'customer_details' => [
+
+                    'first_name' =>
+                        $customerName,
+
+                    'email' =>
+                        $customerEmail,
+
+                    'phone' =>
+                        $customerPhone
+                ],
+
+
+                'item_details' => [
+
+                    [
+
+                        'id' =>
+                            (string) $packageId,
+
+                        'price' =>
+                            (int) $price,
+
+                        'quantity' =>
+                            1,
+
+                        'name' =>
+                            $packageName
+                    ]
+
+                ]
+
+            ];
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | REQUEST SNAP TOKEN
+            |--------------------------------------------------------------------------
+            */
+
+            $snapToken =
+                \Midtrans\Snap::getSnapToken(
+                    $params
+                );
+
+
+            if (
+                empty($snapToken)
+            ) {
+
+                throw new Exception(
+                    "Snap Token tidak berhasil dibuat."
+                );
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SIMPAN KE SESSION
+            |--------------------------------------------------------------------------
+            |
+            | Session hanya digunakan untuk membantu halaman frontend.
+            |
+            | STATUS CUSTOMER TIDAK DIUBAH DI SINI.
+            |
+            */
+
+            $_SESSION['midtrans_order_id'] =
+                $orderId;
+
+            $_SESSION['midtrans_snap_token'] =
+                $snapToken;
+
+            $_SESSION['payment_method'] =
+                $method;
+
+            $_SESSION['payment_package_id'] =
+                $packageId;
+
+
+        } catch (Throwable $e) {
+
+            $error =
+                "Gagal membuat transaksi pembayaran: " .
+                $e->getMessage();
         }
     }
 }
 
-$customerName = $_SESSION['username'] ?? 'Customer';
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL TOKEN DARI SESSION
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $snapToken === null &&
+    !empty($_SESSION['midtrans_snap_token'])
+) {
+
+    $snapToken =
+        $_SESSION['midtrans_snap_token'];
+}
+
+
+if (
+    $orderId === null &&
+    !empty($_SESSION['midtrans_order_id'])
+) {
+
+    $orderId =
+        $_SESSION['midtrans_order_id'];
+}
+
 ?>
+
 <!DOCTYPE html>
+
 <html lang="id">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pembayaran Paket | Customer Portal</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="assets/css/packages.css">
-    <style>
-        .payment-page { min-height: 100vh; background: #f5f7fb; }
-        .payment-box { max-width: 680px; margin: 0 auto; padding: 32px; border: 1px solid #e8ebf2; border-radius: 18px; background: #fff; box-shadow: 0 8px 28px rgba(15,23,42,.07); }
-        .payment-box h1 { margin: 0 0 8px; color: #172033; font-size: 26px; }
-        .payment-box > p { color: #667085; font-size: 13px; }
-        .payment-package { display: flex; justify-content: space-between; gap: 20px; margin: 22px 0; padding: 18px; border-radius: 13px; color: #fff; background: linear-gradient(135deg, #2563eb, #4338ca); }
-        .payment-package strong, .payment-package span { display: block; }
-        .payment-package strong { font-size: 17px; }
-        .payment-package span { margin-top: 5px; color: #dbeafe; font-size: 12px; }
-        .payment-price { font-size: 18px; font-weight: 800; white-space: nowrap; }
-        .method-label { display: block; margin-bottom: 10px; color: #344054; font-size: 12px; font-weight: 700; }
-        .method-list { display: grid; gap: 9px; }
-        .method-option { display: flex; align-items: center; gap: 10px; padding: 13px; border: 1px solid #e2e8f0; border-radius: 10px; color: #475569; font-size: 12px; cursor: pointer; }
-        .method-option:has(input:checked) { border-color: #93c5fd; color: #2563eb; background: #eff6ff; }
-        .payment-error { margin-bottom: 15px; padding: 12px; border-radius: 9px; color: #991b1b; background: #fee2e2; font-size: 12px; }
-        .pay-submit { width: 100%; margin-top: 22px; padding: 13px; border: 0; border-radius: 10px; color: #fff; background: #2563eb; font-weight: 700; cursor: pointer; }
-        @media (max-width: 600px) { .payment-box { padding: 24px 19px; } .payment-package { flex-direction: column; gap: 8px; } }
-    </style>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Pembayaran | WiFi Management
+    </title>
+
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="assets/css/payment.css?v=<?= time() ?>"
+    >
+
+
+    <!-- MIDTRANS SNAP -->
+
+    <script
+        src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key="<?= e(\Midtrans\Config::$clientKey) ?>"
+    ></script>
+
 </head>
+
+
 <body>
+
+
 <div class="payment-page">
-    <nav class="packages-navbar"><a href="packages.php" class="back-dashboard"><i class="bi bi-arrow-left"></i></a><div class="nav-title"><strong>Pembayaran Paket</strong><span>Aktifkan layanan internet kamu</span></div><a href="subscription.php" class="dashboard-link"><i class="bi bi-person-check-fill"></i> Langganan</a></nav>
-    <main class="container">
-        <div class="payment-box">
-            <span class="eyebrow"><i class="bi bi-shield-check"></i> PEMBAYARAN AMAN</span>
-            <h1>Konfirmasi paket</h1>
-            <p>Periksa detail paket dan pilih metode pembayaran untuk mengaktifkan layanan.</p>
-            <?php if ($error): ?><div class="payment-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
-            <div class="payment-package"><div><strong><?= htmlspecialchars($package['nama_paket']) ?></strong><span><i class="bi bi-lightning-charge-fill"></i> <?= htmlspecialchars($package['kecepatan']) ?></span></div><div class="payment-price">Rp <?= number_format($package['harga'], 0, ',', '.') ?><small>/bulan</small></div></div>
-            <form method="POST">
-                <input type="hidden" name="package_id" value="<?= $packageId ?>">
-                <input type="hidden" name="renewal" value="<?= $isRenewal ? 1 : 0 ?>">
-                <span class="method-label">Pilih metode pembayaran</span>
-                <div class="method-list">
-                    <label class="method-option"><input type="radio" name="method" value="transfer_bank" checked> <i class="bi bi-bank"></i> Transfer Bank</label>
-                    <label class="method-option"><input type="radio" name="method" value="e_wallet"> <i class="bi bi-wallet2"></i> E-Wallet</label>
-                    <label class="method-option"><input type="radio" name="method" value="virtual_account"> <i class="bi bi-credit-card"></i> Virtual Account</label>
+
+
+    <!-- NAVBAR -->
+
+    <header class="payment-navbar">
+
+        <a
+            href="packages.php"
+            class="brand"
+        >
+
+            <div class="brand-icon">
+
+                <i class="bi bi-wifi"></i>
+
+            </div>
+
+
+            <div class="brand-text">
+
+                <strong>
+                    WiFi Management
+                </strong>
+
+                <span>
+                    Customer Portal
+                </span>
+
+            </div>
+
+        </a>
+
+
+        <div class="navbar-right">
+
+            <a
+                href="packages.php"
+                class="back-link"
+            >
+
+                <i class="bi bi-arrow-left"></i>
+
+                Ganti Paket
+
+            </a>
+
+
+            <div class="user-mini">
+
+                <div class="avatar">
+
+                    <?= e($initial) ?>
+
                 </div>
-                <button type="submit" name="confirm_payment" class="pay-submit"><i class="bi bi-lock-fill"></i> Bayar dan Aktifkan Subscription</button>
-            </form>
+
+
+                <div class="user-info">
+
+                    <strong>
+                        <?= e($customerName) ?>
+                    </strong>
+
+                    <span>
+                        Customer
+                    </span>
+
+                </div>
+
+            </div>
+
         </div>
+
+    </header>
+
+
+    <!-- MAIN -->
+
+    <main class="payment-container">
+
+
+        <div class="breadcrumb">
+
+            <span>
+
+                <i class="bi bi-house"></i>
+
+                Langganan
+
+            </span>
+
+
+            <i class="bi bi-chevron-right"></i>
+
+
+            <span>
+                Pilih Paket
+            </span>
+
+
+            <i class="bi bi-chevron-right"></i>
+
+
+            <strong>
+                Pembayaran
+            </strong>
+
+        </div>
+
+
+        <section class="page-heading">
+
+            <div class="heading-badge">
+
+                <i class="bi bi-shield-check"></i>
+
+                PEMBAYARAN AMAN
+
+            </div>
+
+
+            <h1>
+                Selesaikan Pembayaran
+            </h1>
+
+
+            <p>
+
+                Periksa kembali paket pilihan kamu,
+                lalu lanjutkan pembayaran melalui
+                payment gateway.
+
+            </p>
+
+        </section>
+
+
+        <!-- STEPPER -->
+
+        <div class="stepper">
+
+            <div class="step completed">
+
+                <div class="step-circle">
+
+                    <i class="bi bi-check-lg"></i>
+
+                </div>
+
+                <span>
+                    Pilih Paket
+                </span>
+
+            </div>
+
+
+            <div class="step-line completed-line"></div>
+
+
+            <div class="step completed">
+
+                <div class="step-circle">
+
+                    <i class="bi bi-check-lg"></i>
+
+                </div>
+
+                <span>
+                    Pengajuan
+                </span>
+
+            </div>
+
+
+            <div class="step-line active-line"></div>
+
+
+            <div class="step active">
+
+                <div class="step-circle">
+                    03
+                </div>
+
+                <span>
+                    Pembayaran
+                </span>
+
+            </div>
+
+
+            <div class="step-line"></div>
+
+
+            <div class="step">
+
+                <div class="step-circle">
+                    04
+                </div>
+
+                <span>
+                    Dashboard
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- ERROR -->
+
+        <?php if ($error !== ''): ?>
+
+            <div class="alert-error">
+
+                <div class="alert-icon">
+
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+
+                </div>
+
+
+                <div class="alert-content">
+
+                    <strong>
+                        Pembayaran tidak dapat diproses
+                    </strong>
+
+                    <span>
+                        <?= e($error) ?>
+                    </span>
+
+                </div>
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <!-- PAYMENT GRID -->
+
+        <div class="payment-grid">
+
+
+            <!-- PACKAGE -->
+
+            <section class="payment-card package-card">
+
+                <div class="card-header">
+
+                    <div>
+
+                        <span class="card-label">
+                            PAKET YANG DIPILIH
+                        </span>
+
+                        <h2>
+                            <?= e($packageName) ?>
+                        </h2>
+
+                    </div>
+
+
+                    <div class="package-icon">
+
+                        <i class="bi bi-wifi"></i>
+
+                    </div>
+
+                </div>
+
+
+                <div class="speed-box">
+
+                    <div class="speed-icon">
+
+                        <i class="bi bi-lightning-charge-fill"></i>
+
+                    </div>
+
+
+                    <div class="speed-info">
+
+                        <span>
+                            KECEPATAN INTERNET
+                        </span>
+
+
+                        <strong>
+                            <?= e($speed) ?> Mbps
+                        </strong>
+
+                    </div>
+
+
+                    <i
+                        class="bi bi-check-circle-fill verified"
+                    ></i>
+
+                </div>
+
+
+                <?php if ($description !== ''): ?>
+
+                    <div class="package-description">
+
+                        <i class="bi bi-info-circle-fill"></i>
+
+                        <span>
+                            <?= e($description) ?>
+                        </span>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+                <div class="included-title">
+
+                    <span>
+                        Fasilitas Paket
+                    </span>
+
+                    <small>
+                        Termasuk dalam layanan
+                    </small>
+
+                </div>
+
+
+                <div class="feature-list">
+
+                    <div class="feature-item">
+
+                        <div class="feature-icon">
+
+                            <i class="bi bi-check-lg"></i>
+
+                        </div>
+
+                        <span>
+                            Internet berkecepatan tinggi
+                        </span>
+
+                    </div>
+
+
+                    <div class="feature-item">
+
+                        <div class="feature-icon">
+
+                            <i class="bi bi-check-lg"></i>
+
+                        </div>
+
+                        <span>
+                            Customer support
+                        </span>
+
+                    </div>
+
+
+                    <div class="feature-item">
+
+                        <div class="feature-icon">
+
+                            <i class="bi bi-check-lg"></i>
+
+                        </div>
+
+                        <span>
+                            Monitoring layanan
+                        </span>
+
+                    </div>
+
+
+                    <div class="feature-item">
+
+                        <div class="feature-icon">
+
+                            <i class="bi bi-check-lg"></i>
+
+                        </div>
+
+                        <span>
+                            Masa aktif 30 hari
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="package-price">
+
+                    <span>
+                        Harga Paket
+                    </span>
+
+
+                    <strong>
+                        <?= rupiah($price) ?>
+                    </strong>
+
+
+                    <small>
+                        / 30 hari
+                    </small>
+
+                </div>
+
+            </section>
+
+
+            <!-- CHECKOUT -->
+
+            <section class="payment-card checkout-card">
+
+
+                <div class="checkout-title">
+
+                    <div>
+
+                        <span class="card-label">
+                            RINGKASAN
+                        </span>
+
+
+                        <h2>
+                            Pembayaran
+                        </h2>
+
+                    </div>
+
+
+                    <div class="secure-icon">
+
+                        <i class="bi bi-lock-fill"></i>
+
+                    </div>
+
+                </div>
+
+
+                <div class="price-row">
+
+                    <span>
+                        <?= e($packageName) ?>
+                    </span>
+
+
+                    <strong>
+                        <?= rupiah($price) ?>
+                    </strong>
+
+                </div>
+
+
+                <div class="price-row muted">
+
+                    <span>
+                        Masa aktif
+                    </span>
+
+
+                    <span>
+                        30 Hari
+                    </span>
+
+                </div>
+
+
+                <div class="divider"></div>
+
+
+                <div class="total-row">
+
+                    <div>
+
+                        <span>
+                            Total Pembayaran
+                        </span>
+
+                        <small>
+                            Paket internet
+                        </small>
+
+                    </div>
+
+
+                    <strong>
+                        <?= rupiah($price) ?>
+                    </strong>
+
+                </div>
+
+
+                <!-- FORM -->
+
+                <form
+                    method="POST"
+                    action="payment.php?paket_id=<?= (int) $packageId ?>"
+                    id="paymentForm"
+                >
+
+                    <input
+                        type="hidden"
+                        name="paket_id"
+                        value="<?= (int) $packageId ?>"
+                    >
+
+
+                    <div class="method-title">
+
+                        <div class="method-title-icon">
+
+                            <i class="bi bi-wallet2"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <strong>
+                                Metode Pembayaran
+                            </strong>
+
+                            <small>
+                                Pilih salah satu metode
+                            </small>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="method-list">
+
+
+                        <label class="method-option">
+
+                            <input
+                                type="radio"
+                                name="method"
+                                value="transfer_bank"
+                                checked
+                            >
+
+
+                            <span class="method-icon">
+
+                                <i class="bi bi-bank"></i>
+
+                            </span>
+
+
+                            <span class="method-info">
+
+                                <strong>
+                                    Transfer Bank
+                                </strong>
+
+                                <small>
+                                    BCA, BRI, BNI, Mandiri
+                                </small>
+
+                            </span>
+
+
+                            <span class="radio-check">
+
+                                <i class="bi bi-check"></i>
+
+                            </span>
+
+                        </label>
+
+
+                        <label class="method-option">
+
+                            <input
+                                type="radio"
+                                name="method"
+                                value="e_wallet"
+                            >
+
+
+                            <span class="method-icon">
+
+                                <i class="bi bi-wallet2"></i>
+
+                            </span>
+
+
+                            <span class="method-info">
+
+                                <strong>
+                                    E-Wallet
+                                </strong>
+
+                                <small>
+                                    OVO, DANA, GoPay
+                                </small>
+
+                            </span>
+
+
+                            <span class="radio-check">
+
+                                <i class="bi bi-check"></i>
+
+                            </span>
+
+                        </label>
+
+
+                        <label class="method-option">
+
+                            <input
+                                type="radio"
+                                name="method"
+                                value="virtual_account"
+                            >
+
+
+                            <span class="method-icon">
+
+                                <i class="bi bi-credit-card"></i>
+
+                            </span>
+
+
+                            <span class="method-info">
+
+                                <strong>
+                                    Virtual Account
+                                </strong>
+
+                                <small>
+                                    Pembayaran otomatis
+                                </small>
+
+                            </span>
+
+
+                            <span class="radio-check">
+
+                                <i class="bi bi-check"></i>
+
+                            </span>
+
+                        </label>
+
+                    </div>
+
+
+                    <div class="secure-note">
+
+                        <div class="secure-note-icon">
+
+                            <i class="bi bi-shield-check"></i>
+
+                        </div>
+
+
+                        <span>
+
+                            Status layanan akan menjadi
+                            <strong>aktif</strong>
+                            setelah pembayaran berhasil
+                            dikonfirmasi oleh server.
+
+                        </span>
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        name="confirm_payment"
+                        value="1"
+                        class="pay-button"
+                        id="payButton"
+                    >
+
+                        <span class="button-normal">
+
+                            <i class="bi bi-credit-card"></i>
+
+                            Bayar Sekarang
+
+                        </span>
+
+
+                        <span class="button-loading">
+
+                            <i class="bi bi-arrow-repeat"></i>
+
+                            Membuka pembayaran...
+
+                        </span>
+
+                    </button>
+
+                </form>
+
+
+                <a
+                    href="packages.php"
+                    class="change-package"
+                >
+
+                    <i class="bi bi-arrow-left"></i>
+
+                    Ganti Paket
+
+                </a>
+
+            </section>
+
+        </div>
+
     </main>
+
+
+    <footer class="payment-footer">
+
+        <div class="footer-brand">
+
+            <div class="footer-icon">
+
+                <i class="bi bi-wifi"></i>
+
+            </div>
+
+
+            <strong>
+                WiFi Management
+            </strong>
+
+        </div>
+
+
+        <span>
+
+            © <?= date('Y') ?>
+
+            Customer Portal
+
+        </span>
+
+    </footer>
+
 </div>
+
+
+<script>
+
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+        const form =
+            document.getElementById(
+                'paymentForm'
+            );
+
+        const button =
+            document.getElementById(
+                'payButton'
+            );
+
+
+        if (!form || !button) {
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | METODE PEMBAYARAN
+        |--------------------------------------------------------------------------
+        */
+
+        const methodOptions =
+            document.querySelectorAll(
+                '.method-option'
+            );
+
+
+        methodOptions.forEach(
+            function (option) {
+
+                const radio =
+                    option.querySelector(
+                        'input[type="radio"]'
+                    );
+
+
+                if (!radio) {
+                    return;
+                }
+
+
+                if (radio.checked) {
+
+                    option.classList.add(
+                        'selected'
+                    );
+                }
+
+
+                radio.addEventListener(
+                    'change',
+                    function () {
+
+                        methodOptions.forEach(
+                            function (item) {
+
+                                item.classList.remove(
+                                    'selected'
+                                );
+
+                            }
+                        );
+
+
+                        if (radio.checked) {
+
+                            option.classList.add(
+                                'selected'
+                            );
+
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SNAP TOKEN
+        |--------------------------------------------------------------------------
+        */
+
+        const snapToken =
+            <?= json_encode(
+                $snapToken,
+                JSON_UNESCAPED_SLASHES
+            ) ?>;
+
+
+        const currentOrderId =
+            <?= json_encode(
+                $orderId,
+                JSON_UNESCAPED_SLASHES
+            ) ?>;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FORM SUBMIT
+        |--------------------------------------------------------------------------
+        */
+
+        form.addEventListener(
+            'submit',
+            function (event) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | TOKEN SUDAH ADA
+                |--------------------------------------------------------------------------
+                |
+                | Jangan submit POST kedua kali.
+                | Langsung buka Midtrans Snap.
+                |
+                */
+
+                if (snapToken) {
+
+                    event.preventDefault();
+
+                    button.disabled = true;
+
+                    button.classList.add(
+                        'loading'
+                    );
+
+
+                    snap.pay(
+                        snapToken,
+                        {
+
+                            onSuccess:
+                                function (result) {
+
+                                    /*
+                                    |--------------------------------------------------------------------------
+                                    | JANGAN AKTIFKAN CUSTOMER DI SINI
+                                    |--------------------------------------------------------------------------
+                                    |
+                                    | Status pembayaran tetap diverifikasi
+                                    | oleh webhook Midtrans.
+                                    |
+                                    */
+
+                                    window.location.href =
+                                        'payment_success.php?order_id=' +
+                                        encodeURIComponent(
+                                            result.order_id
+                                        );
+                                },
+
+
+                            onPending:
+                                function (result) {
+
+                                    window.location.href =
+                                        'payment_pending.php?order_id=' +
+                                        encodeURIComponent(
+                                            result.order_id
+                                        );
+                                },
+
+
+                            onError:
+                                function () {
+
+                                    button.disabled =
+                                        false;
+
+                                    button.classList.remove(
+                                        'loading'
+                                    );
+
+                                    alert(
+                                        'Pembayaran gagal diproses.'
+                                    );
+                                },
+
+
+                            onClose:
+                                function () {
+
+                                    button.disabled =
+                                        false;
+
+                                    button.classList.remove(
+                                        'loading'
+                                    );
+
+                                }
+
+                        }
+                    );
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | TOKEN BELUM ADA
+                |--------------------------------------------------------------------------
+                |
+                | Biarkan form POST ke PHP.
+                | PHP akan membuat transaksi Midtrans.
+                |
+                */
+
+                button.disabled = true;
+
+                button.classList.add(
+                    'loading'
+                );
+
+            }
+        );
+
+    }
+);
+
+</script>
+
+
 </body>
+
 </html>

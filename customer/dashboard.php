@@ -1,224 +1,37 @@
 <?php
 
+session_start();
+
 require_once "../config/database.php";
 require_once "../config/auth.php";
 
 requireRole('customer');
 
-$userId = $_SESSION['user_id'];
+date_default_timezone_set('Asia/Jakarta');
 
-/* Dashboard hanya boleh dibuka oleh customer dengan subscription aktif. */
-$accessStmt = $conn->prepare(
-    "SELECT status, tgl_berakhir
-     FROM subscriptions
-     WHERE id_user = ?
-     ORDER BY id DESC
-     LIMIT 1"
-);
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-if (!$accessStmt) {
-    die("Validasi subscription gagal.");
-}
 
-$accessStmt->bind_param("i", $userId);
-$accessStmt->execute();
-$accessSubscription = $accessStmt->get_result()->fetch_assoc();
-$accessStmt->close();
+/*
+|--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
 
-if (!$accessSubscription) {
-    header("Location: subscription.php");
-    exit;
-}
-
-$expiredByDate = !empty($accessSubscription['tgl_berakhir'])
-    && strtotime($accessSubscription['tgl_berakhir']) < time();
-
-if ($accessSubscription['status'] === 'expired' || $expiredByDate) {
-    header("Location: renewal.php");
-    exit;
-}
-
-if ($accessSubscription['status'] !== 'active') {
-    header("Location: subscription.php");
-    exit;
+function e($value): string
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
 }
 
 
-/* =====================================================
-   DATA CUSTOMER
-===================================================== */
-
-$stmt = $conn->prepare("
-    SELECT *
-    FROM customers
-    WHERE user_id = ?
-    LIMIT 1
-");
-
-$stmt->bind_param("i", $userId);
-$stmt->execute();
-
-$customer = $stmt->get_result()->fetch_assoc();
-
-if (!$customer) {
-    die("Data customer tidak ditemukan.");
-}
-
-$customerId = $customer['id'];
-
-$nama = $customer['nama'] ?? 'Customer';
-
-$initial = strtoupper(
-    substr(trim($nama), 0, 1)
-);
-
-
-/* =====================================================
-   TOTAL INSTALASI
-===================================================== */
-
-$stmt = $conn->prepare("
-    SELECT COUNT(*) AS total
-    FROM instalasi
-    WHERE id_customer = ?
-");
-
-$stmt->bind_param("i", $customerId);
-$stmt->execute();
-
-$totalInstalasi =
-    $stmt->get_result()->fetch_assoc()['total'] ?? 0;
-
-
-/* =====================================================
-   TOTAL COMPLAINT
-===================================================== */
-
-$stmt = $conn->prepare("
-    SELECT COUNT(*) AS total
-    FROM complaint
-    WHERE id_customer = ?
-    AND status NOT IN ('closed', 'resolved')
-");
-
-$stmt->bind_param("i", $customerId);
-$stmt->execute();
-
-$totalComplaint =
-    $stmt->get_result()->fetch_assoc()['total'] ?? 0;
-
-/* =====================================================
-   TOTAL NOTIFIKASI BELUM DIBACA
-===================================================== */
-
-$totalNotification = 0;
-
-try {
-
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM notifications
-        WHERE (id_user = ? OR id_user IS NULL)
-        AND dibaca = 0
-    ");
-
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $totalNotification =
-        $stmt->get_result()->fetch_assoc()['total'] ?? 0;
-
-} catch (Exception $e) {
-
-    $totalNotification = 0;
-
-}
-
-
-/* =====================================================
-   TAGIHAN
-===================================================== */
-
-$tagihan = null;
-
-try {
-
-    $stmt = $conn->prepare("
-        SELECT *
-        FROM tagihan
-        WHERE id_customer = ?
-        AND status IN ('unpaid', 'pending')
-        ORDER BY jatuh_tempo ASC
-        LIMIT 1
-    ");
-
-    $stmt->bind_param("i", $customerId);
-    $stmt->execute();
-
-    $tagihan = $stmt->get_result()->fetch_assoc();
-
-} catch (Exception $e) {
-
-    $tagihan = null;
-
-}
-
-
-/* =====================================================
-   RIWAYAT PEMBAYARAN
-===================================================== */
-
-$payments = [];
-
-try {
-
-    $stmt = $conn->prepare("
-        SELECT *
-        FROM pembayaran
-        WHERE id_customer = ?
-        ORDER BY created_at DESC
-        LIMIT 5
-    ");
-
-    $stmt->bind_param("i", $customerId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    while ($row = $result->fetch_assoc()) {
-        $payments[] = $row;
-    }
-
-} catch (Exception $e) {
-
-    $payments = [];
-
-}
-
-
-/* =====================================================
-   DATA PAKET
-===================================================== */
-
-$paketNama =
-    $customer['paket'] ??
-    $customer['nama_paket'] ??
-    'Internet Home';
-
-$paketSpeed =
-    $customer['speed'] ??
-    $customer['kecepatan'] ??
-    '100 Mbps';
-
-
-/* =====================================================
-   FORMAT RUPIAH
-===================================================== */
-
-function rupiah($angka)
+function rupiah($value): string
 {
     return 'Rp ' . number_format(
-        (float)$angka,
+        (float) $value,
         0,
         ',',
         '.'
@@ -226,22 +39,1021 @@ function rupiah($angka)
 }
 
 
-/* =====================================================
-   DATA TAGIHAN
-===================================================== */
+function formatTanggal($tanggal): string
+{
+    if (!$tanggal || $tanggal === '-') {
+        return '-';
+    }
 
-$jumlahTagihan =
-    $tagihan['jumlah'] ??
-    $tagihan['amount'] ??
+    $time = strtotime($tanggal);
+
+    if (!$time) {
+        return e($tanggal);
+    }
+
+    return date('d M Y', $time);
+}
+
+
+function tableExists(
+    mysqli $conn,
+    string $table
+): bool {
+
+    $table = $conn->real_escape_string($table);
+
+    $result = $conn->query(
+        "SHOW TABLES LIKE '{$table}'"
+    );
+
+    return $result &&
+           $result->num_rows > 0;
+}
+
+
+function columnExists(
+    mysqli $conn,
+    string $table,
+    string $column
+): bool {
+
+    $table = $conn->real_escape_string($table);
+    $column = $conn->real_escape_string($column);
+
+    $result = $conn->query(
+        "SHOW COLUMNS FROM `{$table}` LIKE '{$column}'"
+    );
+
+    return $result &&
+           $result->num_rows > 0;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| NORMALISASI STATUS
+|--------------------------------------------------------------------------
+*/
+
+function normalizeSubscriptionStatus(
+    $status
+): string {
+
+    $status = strtolower(
+        trim(
+            (string) $status
+        )
+    );
+
+
+    /*
+    |----------------------------------------------------------------------
+    | STATUS AKTIF
+    |----------------------------------------------------------------------
+    */
+
+    if (
+        in_array(
+            $status,
+            [
+                'active',
+                'aktif'
+            ],
+            true
+        )
+    ) {
+
+        return 'active';
+    }
+
+
+    /*
+    |----------------------------------------------------------------------
+    | STATUS PENDING
+    |----------------------------------------------------------------------
+    */
+
+    if (
+        in_array(
+            $status,
+            [
+                'pending',
+                'proses',
+                'menunggu_pemasangan',
+                'menunggu pemasangan'
+            ],
+            true
+        )
+    ) {
+
+        return 'pending';
+    }
+
+
+    /*
+    |----------------------------------------------------------------------
+    | STATUS SUSPENDED
+    |----------------------------------------------------------------------
+    */
+
+    if (
+        in_array(
+            $status,
+            [
+                'suspended',
+                'ditangguhkan'
+            ],
+            true
+        )
+    ) {
+
+        return 'suspended';
+    }
+
+
+    /*
+    |----------------------------------------------------------------------
+    | STATUS TERMINATED
+    |----------------------------------------------------------------------
+    */
+
+    if (
+        in_array(
+            $status,
+            [
+                'terminated',
+                'berakhir',
+                'nonaktif'
+            ],
+            true
+        )
+    ) {
+
+        return 'terminated';
+    }
+
+
+    /*
+    |----------------------------------------------------------------------
+    | DEFAULT
+    |----------------------------------------------------------------------
+    */
+
+    return 'belum_berlangganan';
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CEK LOGIN
+|--------------------------------------------------------------------------
+*/
+
+$userId = (int) (
+    $_SESSION['user_id'] ?? 0
+);
+
+
+if ($userId <= 0) {
+
+    header(
+        "Location: ../login.php"
+    );
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT DATA
+|--------------------------------------------------------------------------
+*/
+
+$customer = null;
+
+$customerId = 0;
+
+$nama =
+    $_SESSION['nama']
+    ??
+    $_SESSION['username']
+    ??
+    'Customer';
+
+$email =
+    $_SESSION['email']
+    ??
+    '';
+
+$telephone = '';
+
+$alamat = '';
+
+
+$statusLangganan =
+    'belum_berlangganan';
+
+
+$paketNama =
+    'Belum Memilih Paket';
+
+$paketSpeed =
+    '-';
+
+$paketHarga =
     0;
 
-$tanggalJatuhTempo =
-    $tagihan['jatuh_tempo'] ??
+
+$totalInstalasi =
+    0;
+
+$totalGangguan =
+    0;
+
+
+$jumlahTagihan =
+    0;
+
+$jatuhTempo =
     '-';
+
+$nomorTagihan =
+    '-';
+
+
+$riwayatPembayaran =
+    [];
+
+
+/*
+|--------------------------------------------------------------------------
+| DATA CONTOH UNTUK TAMPILAN
+|--------------------------------------------------------------------------
+*/
+
+$downloadMbps =
+    87.4;
+
+$uploadMbps =
+    18.2;
+
+$pingMs =
+    9;
+
+$networkNormal =
+    true;
+
+
+/*
+|--------------------------------------------------------------------------
+| CEK TABEL CUSTOMER
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !tableExists(
+        $conn,
+        'customers'
+    )
+) {
+
+    die(
+        "Tabel customers tidak ditemukan."
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL CUSTOMER + PAKET
+|--------------------------------------------------------------------------
+*/
+
+$sqlCustomer = "
+
+    SELECT
+
+        c.*,
+
+        p.nama_paket,
+
+        p.speed_mbps,
+
+        p.harga AS harga_paket,
+
+        p.deskripsi AS deskripsi_paket
+
+    FROM customers c
+
+    LEFT JOIN paket_wifi p
+
+        ON p.id = c.paket_id
+
+    WHERE c.user_id = ?
+
+    LIMIT 1
+
+";
+
+
+$stmt =
+    $conn->prepare(
+        $sqlCustomer
+    );
+
+
+if (!$stmt) {
+
+    die(
+        "Query customer gagal: " .
+        e($conn->error)
+    );
+}
+
+
+$stmt->bind_param(
+    "i",
+    $userId
+);
+
+
+$stmt->execute();
+
+
+$result =
+    $stmt->get_result();
+
+
+if (
+    $result &&
+    $result->num_rows > 0
+) {
+
+    $customer =
+        $result->fetch_assoc();
+
+} else {
+
+    $stmt->close();
+
+    die(
+        "Data customer tidak ditemukan."
+    );
+}
+
+
+$stmt->close();
+
+
+/*
+|--------------------------------------------------------------------------
+| DATA CUSTOMER
+|--------------------------------------------------------------------------
+*/
+
+$customerId =
+    (int) (
+        $customer['id']
+        ??
+        0
+    );
+
+
+$nama = trim(
+    (string) (
+        $customer['nama']
+        ??
+        $customer['name']
+        ??
+        $_SESSION['nama']
+        ??
+        $_SESSION['username']
+        ??
+        'Customer'
+    )
+);
+
+
+if ($nama === '') {
+
+    $nama =
+        'Customer';
+}
+
+
+$email =
+    $customer['email']
+    ??
+    $_SESSION['email']
+    ??
+    '';
+
+
+$telephone =
+    $customer['telephone']
+    ??
+    $customer['no_hp']
+    ??
+    $customer['phone']
+    ??
+    '';
+
+
+$alamat =
+    $customer['alamat']
+    ??
+    $customer['address']
+    ??
+    '';
+
+
+/*
+|--------------------------------------------------------------------------
+| STATUS LANGGANAN
+|--------------------------------------------------------------------------
+|
+| Database boleh menyimpan:
+|
+| active
+| aktif
+| pending
+| proses
+| menunggu_pemasangan
+|
+| Tetapi aplikasi menggunakan status yang konsisten.
+|
+*/
+
+$statusLangganan =
+    normalizeSubscriptionStatus(
+        $customer['status_langganan']
+        ??
+        ''
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| DATA PAKET
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !empty(
+        $customer['nama_paket']
+    )
+) {
+
+    $paketNama =
+        $customer['nama_paket'];
+}
+
+
+if (
+    isset(
+        $customer['speed_mbps']
+    ) &&
+    $customer['speed_mbps'] !== null
+) {
+
+    $paketSpeed =
+        $customer['speed_mbps'] .
+        ' Mbps';
+}
+
+
+if (
+    isset(
+        $customer['harga_paket']
+    ) &&
+    $customer['harga_paket'] !== null
+) {
+
+    $paketHarga =
+        (float)
+        $customer['harga_paket'];
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| STATUS DISPLAY
+|--------------------------------------------------------------------------
+*/
+
+$statusLabel =
+    'Belum Berlangganan';
+
+$statusClass =
+    'pending';
+
+$statusIcon =
+    'bi-cart3';
+
+
+switch (
+    $statusLangganan
+) {
+
+    case 'active':
+
+        $statusLabel =
+            'Layanan Aktif';
+
+        $statusClass =
+            'active';
+
+        $statusIcon =
+            'bi-check-circle-fill';
+
+        break;
+
+
+    case 'pending':
+
+        $statusLabel =
+            'Menunggu Aktivasi';
+
+        $statusClass =
+            'pending';
+
+        $statusIcon =
+            'bi-hourglass-split';
+
+        break;
+
+
+    case 'suspended':
+
+        $statusLabel =
+            'Layanan Ditangguhkan';
+
+        $statusClass =
+            'suspended';
+
+        $statusIcon =
+            'bi-pause-circle-fill';
+
+        break;
+
+
+    case 'terminated':
+
+        $statusLabel =
+            'Layanan Berakhir';
+
+        $statusClass =
+            'terminated';
+
+        $statusIcon =
+            'bi-x-circle-fill';
+
+        break;
+
+
+    default:
+
+        $statusLabel =
+            'Belum Berlangganan';
+
+        $statusClass =
+            'pending';
+
+        $statusIcon =
+            'bi-cart3';
+
+        break;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL INSTALASI
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $customerId > 0 &&
+    tableExists(
+        $conn,
+        'instalasi'
+    ) &&
+    columnExists(
+        $conn,
+        'instalasi',
+        'id_customer'
+    )
+) {
+
+    $stmt =
+        $conn->prepare("
+            SELECT COUNT(*) AS total
+            FROM instalasi
+            WHERE id_customer = ?
+        ");
+
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            "i",
+            $customerId
+        );
+
+        $stmt->execute();
+
+        $result =
+            $stmt->get_result();
+
+
+        if ($result) {
+
+            $row =
+                $result->fetch_assoc();
+
+            $totalInstalasi =
+                (int) (
+                    $row['total']
+                    ??
+                    0
+                );
+        }
+
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL GANGGUAN
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $customerId > 0 &&
+    tableExists(
+        $conn,
+        'complaint'
+    ) &&
+    columnExists(
+        $conn,
+        'complaint',
+        'id_customer'
+    )
+) {
+
+    $sqlComplaint = "
+
+        SELECT COUNT(*) AS total
+
+        FROM complaint
+
+        WHERE id_customer = ?
+
+    ";
+
+
+    if (
+        columnExists(
+            $conn,
+            'complaint',
+            'status'
+        )
+    ) {
+
+        $sqlComplaint .= "
+
+            AND LOWER(status)
+            NOT IN (
+                'closed',
+                'resolved'
+            )
+
+        ";
+    }
+
+
+    $stmt =
+        $conn->prepare(
+            $sqlComplaint
+        );
+
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            "i",
+            $customerId
+        );
+
+        $stmt->execute();
+
+        $result =
+            $stmt->get_result();
+
+
+        if ($result) {
+
+            $row =
+                $result->fetch_assoc();
+
+            $totalGangguan =
+                (int) (
+                    $row['total']
+                    ??
+                    0
+                );
+        }
+
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TAGIHAN AKTIF
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $customerId > 0 &&
+    tableExists(
+        $conn,
+        'tagihan'
+    ) &&
+    columnExists(
+        $conn,
+        'tagihan',
+        'id_customer'
+    )
+) {
+
+    $statusCondition = '';
+
+
+    if (
+        columnExists(
+            $conn,
+            'tagihan',
+            'status'
+        )
+    ) {
+
+        $statusCondition = "
+
+            AND LOWER(status)
+
+            IN (
+                'unpaid',
+                'pending',
+                'belum bayar',
+                'belum dibayar'
+            )
+
+        ";
+    }
+
+
+    $order = '';
+
+
+    if (
+        columnExists(
+            $conn,
+            'tagihan',
+            'jatuh_tempo'
+        )
+    ) {
+
+        $order = "
+
+            ORDER BY jatuh_tempo ASC
+
+        ";
+    }
+
+
+    $sqlTagihan = "
+
+        SELECT *
+
+        FROM tagihan
+
+        WHERE id_customer = ?
+
+        {$statusCondition}
+
+        {$order}
+
+        LIMIT 1
+
+    ";
+
+
+    $stmt =
+        $conn->prepare(
+            $sqlTagihan
+        );
+
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            "i",
+            $customerId
+        );
+
+        $stmt->execute();
+
+        $result =
+            $stmt->get_result();
+
+
+        if (
+            $result &&
+            $result->num_rows > 0
+        ) {
+
+            $tagihan =
+                $result->fetch_assoc();
+
+
+            $jumlahTagihan =
+                $tagihan['jumlah']
+                ??
+                $tagihan['total']
+                ??
+                $tagihan['nominal']
+                ??
+                $tagihan['amount']
+                ??
+                0;
+
+
+            $jatuhTempo =
+                $tagihan['jatuh_tempo']
+                ??
+                $tagihan['tanggal_jatuh_tempo']
+                ??
+                '-';
+
+
+            $nomorTagihan =
+                $tagihan['nomor_tagihan']
+                ??
+                $tagihan['invoice']
+                ??
+                $tagihan['kode_tagihan']
+                ??
+                '-';
+        }
+
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| RIWAYAT PEMBAYARAN
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $customerId > 0 &&
+    tableExists(
+        $conn,
+        'pembayaran'
+    ) &&
+    columnExists(
+        $conn,
+        'pembayaran',
+        'id_customer'
+    )
+) {
+
+    $order = '';
+
+
+    if (
+        columnExists(
+            $conn,
+            'pembayaran',
+            'created_at'
+        )
+    ) {
+
+        $order = "
+
+            ORDER BY created_at DESC
+
+        ";
+
+    } elseif (
+        columnExists(
+            $conn,
+            'pembayaran',
+            'tanggal_bayar'
+        )
+    ) {
+
+        $order = "
+
+            ORDER BY tanggal_bayar DESC
+
+        ";
+    }
+
+
+    $sqlPayment = "
+
+        SELECT *
+
+        FROM pembayaran
+
+        WHERE id_customer = ?
+
+        {$order}
+
+        LIMIT 5
+
+    ";
+
+
+    $stmt =
+        $conn->prepare(
+            $sqlPayment
+        );
+
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            "i",
+            $customerId
+        );
+
+        $stmt->execute();
+
+        $result =
+            $stmt->get_result();
+
+
+        if ($result) {
+
+            while (
+                $row =
+                $result->fetch_assoc()
+            ) {
+
+                $riwayatPembayaran[] =
+                    $row;
+            }
+        }
+
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| AVATAR
+|--------------------------------------------------------------------------
+*/
+
+$avatar =
+    strtoupper(
+        substr(
+            trim($nama) ?: 'C',
+            0,
+            1
+        )
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT PAGE
+|--------------------------------------------------------------------------
+*/
+
+$currentPage =
+    basename(
+        $_SERVER['PHP_SELF']
+    );
 
 ?>
 
 <!DOCTYPE html>
+
 <html lang="id">
 
 <head>
@@ -253,8 +1065,13 @@ $tanggalJatuhTempo =
         content="width=device-width, initial-scale=1.0"
     >
 
+    <meta
+        name="theme-color"
+        content="#0f4cdb"
+    >
+
     <title>
-        Customer Dashboard
+        Dashboard Customer - WiFi Management
     </title>
 
 
@@ -269,16 +1086,16 @@ $tanggalJatuhTempo =
     <!-- Bootstrap Icons -->
 
     <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
         rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
     >
 
 
-    <!-- Customer Dashboard CSS -->
+    <!-- Dashboard CSS -->
 
     <link
         rel="stylesheet"
-        href="assets/css/customer-dashboard.css"
+        href="assets/css/dashboard.css"
     >
 
 </head>
@@ -286,290 +1103,415 @@ $tanggalJatuhTempo =
 
 <body>
 
+<div class="customer-layout">
 
-<!-- =====================================================
-     SIDEBAR
-===================================================== -->
 
-<aside class="sidebar">
+    <!-- =====================================================
+         MOBILE OVERLAY
+    ====================================================== -->
 
-    <div class="sidebar-logo">
+    <div
+        class="sidebar-overlay"
+        id="sidebarOverlay"
+    ></div>
 
-        <div class="logo-icon">
 
-            <i class="bi bi-wifi"></i>
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
-        </div>
+    <aside
+        class="sidebar"
+        id="sidebar"
+    >
 
-        <div class="logo-text">
 
-            <h5>
-                WiFi Management
-            </h5>
+        <div class="sidebar-brand">
 
-            <span>
-                Customer Portal
-            </span>
+            <div class="brand-logo">
 
-        </div>
-
-    </div>
-
-
-    <div class="sidebar-menu">
-
-        <p class="menu-title">
-            MENU
-        </p>
-
-
-        <a
-            href="dashboard.php"
-            class="menu-item active"
-        >
-
-            <i class="bi bi-grid-fill"></i>
-
-            <span>
-                Dashboard
-            </span>
-
-        </a>
-
-
-        <a
-            href="billing.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-credit-card-fill"></i>
-
-            <span>
-                Tagihan
-            </span>
-
-        </a>
-
-
-        <a
-            href="usage.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-speedometer2"></i>
-
-            <span>
-                Pemakaian
-            </span>
-
-        </a>
-
-
-        <a
-            href="speedtest.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-lightning-charge-fill"></i>
-
-            <span>
-                Speed Test
-            </span>
-
-        </a>
-
-
-        <a
-            href="complaint.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-tools"></i>
-
-            <span>
-                Gangguan
-            </span>
-
-        </a>
-
-
-        <a
-            href="network_status.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-globe2"></i>
-
-            <span>
-                Status Jaringan
-            </span>
-
-        </a>
-
-
-        <a
-            href="chat.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-chat-dots-fill"></i>
-
-            <span>
-                Chat CS
-            </span>
-
-        </a>
-
-
-        <p class="menu-title menu-account">
-            AKUN
-        </p>
-
-
-        <a
-            href="upgrade.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-arrow-up-circle-fill"></i>
-
-            <span>
-                Upgrade Paket
-            </span>
-
-        </a>
-
-
-        <a
-            href="service_request.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-plus-circle-fill"></i>
-
-            <span>
-                Layanan Tambahan
-            </span>
-
-        </a>
-
-
-        <a
-            href="profile.php"
-            class="menu-item"
-        >
-
-            <i class="bi bi-person-circle"></i>
-
-            <span>
-                Profile Saya
-            </span>
-
-        </a>
-
-
-        <a
-            href="../logout.php"
-            class="menu-item logout"
-        >
-
-            <i class="bi bi-box-arrow-right"></i>
-
-            <span>
-                Logout
-            </span>
-
-        </a>
-
-    </div>
-
-
-    <!-- USER -->
-
-    <div class="sidebar-user">
-
-        <div class="user-avatar">
-
-            <?= htmlspecialchars($initial) ?>
-
-        </div>
-
-        <div class="user-detail">
-
-            <strong>
-                <?= htmlspecialchars($nama) ?>
-            </strong>
-
-            <span>
-                Customer
-            </span>
-
-        </div>
-
-    </div>
-
-</aside>
-
-
-
-<!-- =====================================================
-     MAIN
-===================================================== -->
-
-<main class="main-content">
-
-
-<!-- =====================================================
-     TOPBAR
-===================================================== -->
-
-<header class="topbar">
-
-    <div>
-
-        <h4>
-            Dashboard
-        </h4>
-
-        <span>
-            Kelola layanan internet kamu
-        </span>
-
-    </div>
-
-
-    <div class="topbar-right">
-
-        <a href="notifikasi.php" class="notification" aria-label="Buka notifikasi">
-
-            <i class="bi bi-bell"></i>
-
-            <?php if ($totalNotification > 0): ?>
-
-                <span class="notification-badge">
-                    <?= $totalNotification ?>
-                </span>
-
-            <?php endif; ?>
-
-        </a>
-
-
-        <a
-            href="profile.php"
-            class="top-profile"
-        >
-
-            <div class="top-avatar">
-
-                <?= htmlspecialchars($initial) ?>
+                <i class="bi bi-wifi"></i>
 
             </div>
 
-            <div class="top-user">
+
+            <div class="brand-text">
 
                 <strong>
-                    <?= htmlspecialchars($nama) ?>
+                    WiFi Management
+                </strong>
+
+                <span>
+                    Customer Portal
+                </span>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="sidebar-close"
+                id="sidebarClose"
+            >
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+        <div class="sidebar-scroll">
+
+
+            <div class="menu-section">
+
+                <div class="menu-label">
+                    UTAMA
+                </div>
+
+
+                <a
+                    href="dashboard.php"
+                    class="menu-item <?= $currentPage === 'dashboard.php' ? 'active' : ''; ?>"
+                >
+
+                    <span class="menu-icon">
+
+                        <i class="bi bi-grid-fill"></i>
+
+                    </span>
+
+
+                    <span class="menu-text">
+
+                        Dashboard
+
+                    </span>
+
+                </a>
+
+
+                <?php if (
+                    $statusLangganan === 'active'
+                ): ?>
+
+                    <a
+                        href="billing.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-receipt-cutoff"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Tagihan
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="usage.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-bar-chart-fill"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Pemakaian
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="speedtest.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-speedometer2"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Speed Test
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="complaint.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-tools"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Gangguan
+                        </span>
+
+
+                        <?php if (
+                            $totalGangguan > 0
+                        ): ?>
+
+                            <span class="menu-badge">
+
+                                <?= $totalGangguan; ?>
+
+                            </span>
+
+                        <?php endif; ?>
+
+                    </a>
+
+
+                    <a
+                        href="network_status.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-globe2"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Status Jaringan
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="chat.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-chat-dots-fill"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Chat CS
+                        </span>
+
+                    </a>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <div class="menu-section">
+
+                <div class="menu-label">
+                    LAYANAN
+                </div>
+
+
+                <?php if (
+                    $statusLangganan ===
+                    'belum_berlangganan'
+                ): ?>
+
+                    <a
+                        href="langganan.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-box-seam-fill"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Pilih Paket
+                        </span>
+
+                    </a>
+
+
+                <?php elseif (
+                    $statusLangganan ===
+                    'pending'
+                ): ?>
+
+                    <a
+                        href="installation.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-hammer"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Status Pemasangan
+                        </span>
+
+                    </a>
+
+
+                <?php elseif (
+                    $statusLangganan ===
+                    'active'
+                ): ?>
+
+                    <a
+                        href="upgrade.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-arrow-up-circle-fill"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Upgrade Paket
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="service_request.php"
+                        class="menu-item"
+                    >
+
+                        <span class="menu-icon">
+
+                            <i class="bi bi-plus-circle-fill"></i>
+
+                        </span>
+
+
+                        <span class="menu-text">
+                            Layanan Tambahan
+                        </span>
+
+                    </a>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <div class="menu-section">
+
+                <div class="menu-label">
+                    AKUN
+                </div>
+
+
+                <a
+                    href="profile.php"
+                    class="menu-item"
+                >
+
+                    <span class="menu-icon">
+
+                        <i class="bi bi-person-circle"></i>
+
+                    </span>
+
+
+                    <span class="menu-text">
+                        Profile Saya
+                    </span>
+
+                </a>
+
+
+                <a
+                    href="notifikasi.php"
+                    class="menu-item"
+                >
+
+                    <span class="menu-icon">
+
+                        <i class="bi bi-bell-fill"></i>
+
+                    </span>
+
+
+                    <span class="menu-text">
+                        Notifikasi
+                    </span>
+
+                </a>
+
+
+                <a
+                    href="../logout.php"
+                    class="menu-item logout-item"
+                >
+
+                    <span class="menu-icon">
+
+                        <i class="bi bi-box-arrow-right"></i>
+
+                    </span>
+
+
+                    <span class="menu-text">
+                        Logout
+                    </span>
+
+                </a>
+
+            </div>
+
+        </div>
+
+
+        <!-- SIDEBAR USER -->
+
+        <div class="sidebar-user">
+
+            <div class="sidebar-user-avatar">
+
+                <?= e($avatar); ?>
+
+            </div>
+
+
+            <div class="sidebar-user-info">
+
+                <strong>
+                    <?= e($nama); ?>
                 </strong>
 
                 <span>
@@ -578,1108 +1520,2354 @@ $tanggalJatuhTempo =
 
             </div>
 
-        </a>
 
-    </div>
-
-</header>
-
-
-
-<!-- =====================================================
-     CONTENT
-===================================================== -->
-
-<div class="content">
-
-
-<!-- =====================================================
-     WELCOME
-===================================================== -->
-
-<section class="welcome-card">
-
-    <div class="welcome-content">
-
-        <span>
-            CUSTOMER PORTAL
-        </span>
-
-        <h1>
-            Halo, <?= htmlspecialchars($nama) ?> 👋
-        </h1>
-
-        <p>
-            Pantau internet, bayar tagihan,
-            laporkan gangguan, dan kelola paket
-            dari satu tempat.
-        </p>
-
-    </div>
-
-
-    <div class="welcome-wifi">
-
-        <i class="bi bi-wifi"></i>
-
-    </div>
-
-</section>
-
-
-
-<!-- =====================================================
-     MAIN CARDS
-===================================================== -->
-
-<div class="row g-4">
-
-
-<!-- TAGIHAN -->
-
-<div class="col-lg-4">
-
-    <div class="billing-card">
-
-        <span class="billing-label">
-            TAGIHAN BULAN INI
-        </span>
-
-        <div class="billing-price">
-
-            <?= rupiah($jumlahTagihan) ?>
+            <i class="bi bi-three-dots"></i>
 
         </div>
 
-        <div class="billing-date">
-
-            <i class="bi bi-calendar3"></i>
-
-            Jatuh tempo:
-            <?= htmlspecialchars($tanggalJatuhTempo) ?>
-
-        </div>
+    </aside>
 
 
-        <a
-            href="billing.php"
-            class="btn-pay"
-        >
+    <!-- =====================================================
+         MAIN CONTENT
+    ====================================================== -->
 
-            <i class="bi bi-credit-card"></i>
-
-            Bayar Sekarang
-
-        </a>
-
-    </div>
-
-</div>
+    <main class="main-content">
 
 
+        <!-- TOPBAR -->
 
-<!-- BANDWIDTH -->
+        <header class="topbar">
 
-<div class="col-lg-4">
+            <div class="topbar-left">
 
-    <div class="dashboard-card">
+                <button
+                    type="button"
+                    class="mobile-menu-button"
+                    id="mobileMenuButton"
+                >
 
-        <div class="card-title">
+                    <i class="bi bi-list"></i>
 
-            <h5>
-                Pemakaian Internet
-            </h5>
-
-            <span class="live-text">
-                ● LIVE
-            </span>
-
-        </div>
+                </button>
 
 
-        <span class="speed-label">
-            Download
-        </span>
+                <div>
 
-        <div class="speed-value">
+                    <div class="breadcrumb-text">
 
-            87.4
+                        Customer Portal
 
-            <small>
-                Mbps
-            </small>
+                        <span>
+                            /
+                        </span>
 
-        </div>
+                        Dashboard
 
-
-        <div class="usage-bar">
-
-            <div
-                class="usage-fill"
-                id="usageBar"
-            ></div>
-
-        </div>
+                    </div>
 
 
-        <div class="usage-stats">
-
-            <span>
-                ↓ 87.4 Mbps
-            </span>
-
-            <span>
-                ↑ 18.2 Mbps
-            </span>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-
-<!-- PAKET -->
-
-<div class="col-lg-4">
-
-    <div class="dashboard-card">
-
-        <div class="card-title">
-
-            <h5>
-                Paket Internet
-            </h5>
-
-            <span class="active-text">
-                AKTIF
-            </span>
-
-        </div>
-
-
-        <div class="package-info">
-
-            <div class="package-icon">
-
-                <i class="bi bi-router-fill"></i>
-
-            </div>
-
-
-            <div>
-
-                <strong>
-                    <?= htmlspecialchars($paketNama) ?>
-                </strong>
-
-                <div class="package-speed">
-
-                    <?= htmlspecialchars($paketSpeed) ?>
+                    <h1>
+                        Dashboard
+                    </h1>
 
                 </div>
 
-                <span>
-                    Paket internet aktif
-                </span>
-
-            </div>
-
-        </div>
-
-
-        <a
-            href="upgrade.php"
-            class="btn-outline"
-        >
-
-            Upgrade Paket
-
-        </a>
-
-    </div>
-
-</div>
-
-</div>
-
-
-
-<!-- =====================================================
-     SECOND ROW
-===================================================== -->
-
-<div class="row g-4 mt-1">
-
-
-<!-- SPEED TEST -->
-
-<div class="col-lg-4">
-
-    <div class="dashboard-card speed-test">
-
-        <div class="card-title">
-
-            <h5>
-                Speed Test
-            </h5>
-
-            <span>
-                INTERNET
-            </span>
-
-        </div>
-
-
-        <div class="speed-circle">
-
-            <strong>
-                87.4
-            </strong>
-
-            <span>
-                Mbps
-            </span>
-
-        </div>
-
-
-        <div class="speed-meta">
-
-            <span>
-                <b>18.2</b>
-                Upload
-            </span>
-
-            <span>
-                <b>9 ms</b>
-                Ping
-            </span>
-
-        </div>
-
-
-        <a
-            href="speedtest.php"
-            class="btn-speed"
-        >
-
-            <i class="bi bi-lightning-charge"></i>
-
-            Mulai Speed Test
-
-        </a>
-
-    </div>
-
-</div>
-
-
-
-<!-- STATUS JARINGAN -->
-
-<div class="col-lg-4">
-
-    <div class="dashboard-card">
-
-        <div class="card-title">
-
-            <h5>
-                Status Jaringan
-            </h5>
-
-            <span>
-                AREA KAMU
-            </span>
-
-        </div>
-
-
-        <div class="network-status">
-
-            <div class="network-icon">
-
-                <i class="bi bi-check-lg"></i>
-
             </div>
 
 
-            <div>
+            <div class="topbar-right">
 
-                <strong>
-                    Jaringan Normal
-                </strong>
+                <a
+                    href="notifikasi.php"
+                    class="notification-button"
+                    title="Notifikasi"
+                >
 
-                <span>
-                    Tidak ada gangguan di area kamu
-                </span>
+                    <i class="bi bi-bell"></i>
 
-            </div>
+                    <span class="notification-pulse"></span>
 
-        </div>
-
-
-        <div class="location-info">
-
-            <i class="bi bi-geo-alt-fill"></i>
-
-            Area layanan kamu terpantau normal.
-
-        </div>
+                </a>
 
 
-        <a
-            href="network_status.php"
-            class="btn-light-custom"
-        >
+                <div class="top-profile">
 
-            Lihat Status Jaringan
+                    <div class="top-profile-avatar">
 
-        </a>
+                        <?= e($avatar); ?>
 
-    </div>
-
-</div>
+                    </div>
 
 
+                    <div class="top-profile-info">
 
-<!-- LAPOR GANGGUAN -->
+                        <strong>
+                            <?= e($nama); ?>
+                        </strong>
 
-<div class="col-lg-4">
+                        <span>
+                            Customer
+                        </span>
 
-    <div class="dashboard-card">
-
-        <div class="card-title">
-
-            <h5>
-                Bantuan
-            </h5>
-
-            <span>
-                24/7
-            </span>
-
-        </div>
+                    </div>
 
 
-        <a
-            href="complaint_create.php"
-            class="service-item"
-        >
+                    <i class="bi bi-chevron-down"></i>
 
-            <div class="service-icon complaint-icon">
-
-                <i class="bi bi-tools"></i>
+                </div>
 
             </div>
 
-
-            <div class="service-info">
-
-                <strong>
-                    Laporkan Gangguan
-                </strong>
-
-                <span>
-                    Sertakan foto & lokasi GPS
-                </span>
-
-            </div>
-
-            <i class="bi bi-chevron-right"></i>
-
-        </a>
+        </header>
 
 
-        <a
-            href="complaint_create.php"
-            class="btn-outline-danger"
-        >
+        <!-- CONTENT -->
 
-            Buat Laporan
-
-        </a>
-
-    </div>
-
-</div>
-
-</div>
+        <div class="dashboard-content">
 
 
+            <!-- =================================================
+                 WELCOME
+            ================================================== -->
 
-<!-- =====================================================
-     THIRD ROW
-===================================================== -->
+            <section class="welcome-hero">
 
-<div class="row g-4 mt-1">
+                <div class="hero-decoration hero-decoration-one"></div>
 
-
-<!-- RIWAYAT PEMBAYARAN -->
-
-<div class="col-lg-7">
-
-    <div class="dashboard-card">
-
-        <div class="card-title">
-
-            <h5>
-                Riwayat Pembayaran
-            </h5>
-
-            <a
-                href="billing.php"
-                class="view-all"
-            >
-
-                Lihat Semua
-
-            </a>
-
-        </div>
+                <div class="hero-decoration hero-decoration-two"></div>
 
 
-        <div class="table-responsive">
+                <div class="hero-content">
 
-            <table class="payment-table">
+                    <div class="hero-label">
 
-                <thead>
+                        <span class="hero-label-dot"></span>
 
-                    <tr>
+                        WIFI MANAGEMENT
 
-                        <th>
-                            Tanggal
-                        </th>
-
-                        <th>
-                            Invoice
-                        </th>
-
-                        <th>
-                            Jumlah
-                        </th>
-
-                        <th>
-                            Status
-                        </th>
-
-                    </tr>
-
-                </thead>
+                    </div>
 
 
-                <tbody>
+                    <h2>
 
-                <?php if (!empty($payments)): ?>
+                        Halo,
+                        <?= e($nama); ?>
+                        👋
 
-                    <?php foreach ($payments as $payment): ?>
+                    </h2>
 
-                        <?php
 
-                        $paymentStatus =
-                            strtolower(
-                                $payment['status'] ?? 'paid'
-                            );
+                    <?php if (
+                        $statusLangganan ===
+                        'active'
+                    ): ?>
 
-                        $statusClass =
-                            $paymentStatus === 'paid'
-                            ? 'status-paid'
-                            : 'status-pending';
+                        <p>
 
-                        ?>
+                            Semua layanan internet kamu
+                            siap dipantau dari satu dashboard.
 
-                        <tr>
+                        </p>
 
-                            <td>
-                                <?= htmlspecialchars(
-                                    $payment['created_at'] ?? '-'
-                                ) ?>
-                            </td>
 
-                            <td>
-                                <?= htmlspecialchars(
-                                    $payment['invoice'] ??
-                                    $payment['invoice_number'] ??
-                                    '-'
-                                ) ?>
-                            </td>
+                    <?php elseif (
+                        $statusLangganan ===
+                        'pending'
+                    ): ?>
 
-                            <td>
-                                <?= rupiah(
-                                    $payment['jumlah'] ??
-                                    $payment['amount'] ??
-                                    0
-                                ) ?>
-                            </td>
+                        <p>
 
-                            <td>
+                            Pengajuan pemasangan kamu sedang
+                            diproses oleh tim kami.
 
-                                <span
-                                    class="<?= $statusClass ?>"
+                        </p>
+
+
+                    <?php elseif (
+                        $statusLangganan ===
+                        'suspended'
+                    ): ?>
+
+                        <p>
+
+                            Layanan internet kamu sedang
+                            ditangguhkan. Silakan hubungi
+                            Customer Service.
+
+                        </p>
+
+
+                    <?php elseif (
+                        $statusLangganan ===
+                        'terminated'
+                    ): ?>
+
+                        <p>
+
+                            Layanan internet kamu sudah
+                            berakhir. Hubungi Customer Service
+                            untuk informasi lebih lanjut.
+
+                        </p>
+
+
+                    <?php else: ?>
+
+                        <p>
+
+                            Belum berlangganan?
+                            Pilih paket internet yang sesuai
+                            dan mulai perjalanan internet kamu.
+
+                        </p>
+
+                    <?php endif; ?>
+
+
+                    <div class="hero-actions">
+
+
+                        <?php if (
+                            $statusLangganan ===
+                            'active'
+                        ): ?>
+
+                            <a
+                                href="billing.php"
+                                class="hero-button"
+                            >
+
+                                <i class="bi bi-receipt"></i>
+
+                                Lihat Tagihan
+
+                            </a>
+
+
+                        <?php elseif (
+                            $statusLangganan ===
+                            'pending'
+                        ): ?>
+
+                            <a
+                                href="installation.php"
+                                class="hero-button"
+                            >
+
+                                <i class="bi bi-geo-alt"></i>
+
+                                Lihat Pemasangan
+
+                            </a>
+
+
+                        <?php elseif (
+                            $statusLangganan ===
+                            'belum_berlangganan'
+                        ): ?>
+
+                            <a
+                                href="langganan.php"
+                                class="hero-button"
+                            >
+
+                                <i class="bi bi-box-seam"></i>
+
+                                Pilih Paket Internet
+
+                            </a>
+
+
+                        <?php else: ?>
+
+                            <a
+                                href="chat.php"
+                                class="hero-button"
+                            >
+
+                                <i class="bi bi-headset"></i>
+
+                                Hubungi CS
+
+                            </a>
+
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+
+                <div class="hero-visual">
+
+                    <div class="wifi-orbit orbit-one"></div>
+
+                    <div class="wifi-orbit orbit-two"></div>
+
+                    <div class="wifi-core">
+
+                        <i class="bi bi-wifi"></i>
+
+                    </div>
+
+
+                    <span class="signal-dot dot-one"></span>
+
+                    <span class="signal-dot dot-two"></span>
+
+                    <span class="signal-dot dot-three"></span>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================================
+                 STATUS MINI
+            ================================================== -->
+
+            <section class="status-strip">
+
+
+                <div class="status-strip-item">
+
+                    <div class="status-strip-icon blue">
+
+                        <i class="bi bi-shield-check"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Status Layanan
+                        </span>
+
+                        <strong>
+                            <?= e($statusLabel); ?>
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="status-divider"></div>
+
+
+                <div class="status-strip-item">
+
+                    <div class="status-strip-icon green">
+
+                        <i class="bi bi-router"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Paket Saat Ini
+                        </span>
+
+                        <strong>
+                            <?= e($paketNama); ?>
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="status-divider"></div>
+
+
+                <div class="status-strip-item">
+
+                    <div class="status-strip-icon purple">
+
+                        <i class="bi bi-lightning-charge"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Kecepatan
+                        </span>
+
+                        <strong>
+                            <?= e($paketSpeed); ?>
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <?php if (
+                $statusLangganan ===
+                'active'
+            ): ?>
+
+
+                <!-- =================================================
+                     STATISTICS
+                ================================================== -->
+
+                <div class="section-title-row">
+
+                    <div>
+
+                        <span class="section-kicker">
+                            OVERVIEW
+                        </span>
+
+                        <h2>
+                            Ringkasan Layanan
+                        </h2>
+
+                    </div>
+
+
+                    <span class="section-date">
+
+                        <i class="bi bi-calendar3"></i>
+
+                        Data pelanggan
+
+                    </span>
+
+                </div>
+
+
+                <div class="stats-grid">
+
+
+                    <!-- TAGIHAN -->
+
+                    <div class="stat-card">
+
+                        <div class="stat-top">
+
+                            <div class="stat-icon blue">
+
+                                <i class="bi bi-receipt"></i>
+
+                            </div>
+
+
+                            <span class="stat-tag">
+                                BULAN INI
+                            </span>
+
+                        </div>
+
+
+                        <div class="stat-value">
+
+                            <?= rupiah(
+                                $jumlahTagihan
+                            ); ?>
+
+                        </div>
+
+
+                        <div class="stat-label">
+                            Tagihan aktif
+                        </div>
+
+
+                        <div class="stat-bottom">
+
+                            <span>
+
+                                <i class="bi bi-calendar-event"></i>
+
+                                <?= formatTanggal(
+                                    $jatuhTempo
+                                ); ?>
+
+                            </span>
+
+
+                            <a href="billing.php">
+
+                                Detail
+
+                                <i class="bi bi-arrow-up-right"></i>
+
+                            </a>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- SPEED -->
+
+                    <div class="stat-card">
+
+                        <div class="stat-top">
+
+                            <div class="stat-icon purple">
+
+                                <i class="bi bi-speedometer2"></i>
+
+                            </div>
+
+
+                            <span class="stat-tag green">
+                                LIVE
+                            </span>
+
+                        </div>
+
+
+                        <div class="stat-value">
+
+                            <?= number_format(
+                                $downloadMbps,
+                                1
+                            ); ?>
+
+                            <small>
+                                Mbps
+                            </small>
+
+                        </div>
+
+
+                        <div class="stat-label">
+                            Kecepatan download
+                        </div>
+
+
+                        <div class="stat-bottom">
+
+                            <span class="positive">
+
+                                <i class="bi bi-arrow-down"></i>
+
+                                <?= number_format(
+                                    $downloadMbps,
+                                    1
+                                ); ?>
+
+                            </span>
+
+
+                            <span class="upload-text">
+
+                                <i class="bi bi-arrow-up"></i>
+
+                                <?= number_format(
+                                    $uploadMbps,
+                                    1
+                                ); ?>
+
+                                Mbps
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- GANGGUAN -->
+
+                    <div class="stat-card">
+
+                        <div class="stat-top">
+
+                            <div class="stat-icon orange">
+
+                                <i class="bi bi-tools"></i>
+
+                            </div>
+
+
+                            <span class="stat-tag">
+                                AKTIF
+                            </span>
+
+                        </div>
+
+
+                        <div class="stat-value">
+
+                            <?= $totalGangguan; ?>
+
+                        </div>
+
+
+                        <div class="stat-label">
+                            Laporan gangguan
+                        </div>
+
+
+                        <div class="stat-bottom">
+
+                            <span>
+
+                                <i class="bi bi-activity"></i>
+
+                                Perlu ditangani
+
+                            </span>
+
+
+                            <a href="complaint.php">
+
+                                Detail
+
+                                <i class="bi bi-arrow-up-right"></i>
+
+                            </a>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- INSTALASI -->
+
+                    <div class="stat-card">
+
+                        <div class="stat-top">
+
+                            <div class="stat-icon green">
+
+                                <i class="bi bi-hammer"></i>
+
+                            </div>
+
+
+                            <span class="stat-tag green">
+                                TOTAL
+                            </span>
+
+                        </div>
+
+
+                        <div class="stat-value">
+
+                            <?= $totalInstalasi; ?>
+
+                        </div>
+
+
+                        <div class="stat-label">
+                            Riwayat instalasi
+                        </div>
+
+
+                        <div class="stat-bottom">
+
+                            <span>
+
+                                <i class="bi bi-check2-circle"></i>
+
+                                Tercatat
+
+                            </span>
+
+
+                            <a href="installation.php">
+
+                                Detail
+
+                                <i class="bi bi-arrow-up-right"></i>
+
+                            </a>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     MAIN GRID
+                ================================================== -->
+
+                <div class="main-grid">
+
+
+                    <!-- LEFT -->
+
+                    <div class="main-column">
+
+
+                        <!-- BANDWIDTH -->
+
+                        <div class="dashboard-card bandwidth-card">
+
+                            <div class="card-heading">
+
+                                <div>
+
+                                    <span class="card-kicker">
+                                        NETWORK MONITORING
+                                    </span>
+
+                                    <h3>
+                                        Aktivitas Bandwidth
+                                    </h3>
+
+                                    <p>
+                                        Pantau performa koneksi
+                                        internet secara berkala.
+                                    </p>
+
+                                </div>
+
+
+                                <div class="live-status">
+
+                                    <span></span>
+
+                                    LIVE
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="chart-summary">
+
+
+                                <div>
+
+                                    <span>
+                                        Download
+                                    </span>
+
+                                    <strong>
+
+                                        <?= number_format(
+                                            $downloadMbps,
+                                            1
+                                        ); ?>
+
+                                        <small>
+                                            Mbps
+                                        </small>
+
+                                    </strong>
+
+                                </div>
+
+
+                                <div>
+
+                                    <span>
+                                        Upload
+                                    </span>
+
+                                    <strong>
+
+                                        <?= number_format(
+                                            $uploadMbps,
+                                            1
+                                        ); ?>
+
+                                        <small>
+                                            Mbps
+                                        </small>
+
+                                    </strong>
+
+                                </div>
+
+
+                                <div>
+
+                                    <span>
+                                        Ping
+                                    </span>
+
+                                    <strong>
+
+                                        <?= $pingMs; ?>
+
+                                        <small>
+                                            ms
+                                        </small>
+
+                                    </strong>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="chart-container">
+
+                                <canvas
+                                    id="bandwidthChart"
+                                ></canvas>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- PAYMENT -->
+
+                        <div class="dashboard-card payment-card">
+
+                            <div class="card-heading compact">
+
+                                <div>
+
+                                    <span class="card-kicker">
+                                        TRANSAKSI
+                                    </span>
+
+                                    <h3>
+                                        Riwayat Pembayaran
+                                    </h3>
+
+                                </div>
+
+
+                                <a
+                                    href="billing.php"
+                                    class="view-all"
                                 >
 
-                                    <?= htmlspecialchars(
-                                        strtoupper(
-                                            $payment['status'] ??
-                                            'PAID'
-                                        )
-                                    ) ?>
+                                    Lihat Semua
+
+                                    <i class="bi bi-arrow-right"></i>
+
+                                </a>
+
+                            </div>
+
+
+                            <div class="payment-list">
+
+
+                                <div class="payment-list-head">
+
+                                    <span>
+                                        Tanggal
+                                    </span>
+
+                                    <span>
+                                        Invoice
+                                    </span>
+
+                                    <span>
+                                        Jumlah
+                                    </span>
+
+                                    <span>
+                                        Status
+                                    </span>
+
+                                </div>
+
+
+                                <?php if (
+                                    empty(
+                                        $riwayatPembayaran
+                                    )
+                                ): ?>
+
+
+                                    <div class="payment-empty">
+
+                                        <div class="empty-icon">
+
+                                            <i class="bi bi-receipt"></i>
+
+                                        </div>
+
+
+                                        <strong>
+                                            Belum ada pembayaran
+                                        </strong>
+
+
+                                        <span>
+
+                                            Riwayat pembayaran kamu
+                                            akan muncul di sini.
+
+                                        </span>
+
+                                    </div>
+
+
+                                <?php else: ?>
+
+
+                                    <?php foreach (
+                                        $riwayatPembayaran
+                                        as $payment
+                                    ): ?>
+
+
+                                        <?php
+
+                                        $paymentDate =
+                                            $payment[
+                                                'tanggal_bayar'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'created_at'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'tanggal'
+                                            ]
+                                            ??
+                                            '-';
+
+
+                                        $invoice =
+                                            $payment[
+                                                'nomor_tagihan'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'invoice'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'kode_pembayaran'
+                                            ]
+                                            ??
+                                            '-';
+
+
+                                        $amount =
+                                            $payment[
+                                                'jumlah'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'nominal'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'total'
+                                            ]
+                                            ??
+                                            $payment[
+                                                'amount'
+                                            ]
+                                            ??
+                                            0;
+
+
+                                        $paymentStatus =
+                                            $payment[
+                                                'status'
+                                            ]
+                                            ??
+                                            'paid';
+
+
+                                        $statusText =
+                                            strtolower(
+                                                (string)
+                                                $paymentStatus
+                                            );
+
+
+                                        $isSuccess =
+                                            in_array(
+                                                $statusText,
+                                                [
+                                                    'paid',
+                                                    'lunas',
+                                                    'success',
+                                                    'berhasil'
+                                                ],
+                                                true
+                                            );
+
+                                        ?>
+
+
+                                        <div class="payment-row">
+
+
+                                            <span>
+
+                                                <?= formatTanggal(
+                                                    $paymentDate
+                                                ); ?>
+
+                                            </span>
+
+
+                                            <strong>
+
+                                                <?= e(
+                                                    $invoice
+                                                ); ?>
+
+                                            </strong>
+
+
+                                            <span>
+
+                                                <?= rupiah(
+                                                    $amount
+                                                ); ?>
+
+                                            </span>
+
+
+                                            <span>
+
+
+                                                <span
+                                                    class="payment-badge <?= $isSuccess ? 'success' : 'warning'; ?>"
+                                                >
+
+                                                    <i class="bi bi-check-circle-fill"></i>
+
+                                                    <?= e(
+                                                        ucfirst(
+                                                            $paymentStatus
+                                                        )
+                                                    ); ?>
+
+                                                </span>
+
+
+                                            </span>
+
+                                        </div>
+
+                                    <?php endforeach; ?>
+
+                                <?php endif; ?>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- RIGHT -->
+
+                    <div class="side-column">
+
+
+                        <!-- PACKAGE -->
+
+                        <div class="dashboard-card package-card">
+
+
+                            <div class="card-heading compact">
+
+                                <div>
+
+                                    <span class="card-kicker">
+                                        SUBSCRIPTION
+                                    </span>
+
+                                    <h3>
+                                        Paket Internet
+                                    </h3>
+
+                                </div>
+
+
+                                <span class="active-pill">
+
+                                    <i class="bi bi-check-circle-fill"></i>
+
+                                    AKTIF
 
                                 </span>
 
-                            </td>
+                            </div>
 
-                        </tr>
 
-                    <?php endforeach; ?>
+                            <div class="package-visual">
 
-                <?php else: ?>
+                                <div class="router-icon">
 
-                    <tr>
+                                    <i class="bi bi-router-fill"></i>
 
-                        <td
-                            colspan="4"
-                            class="empty-payment"
-                        >
+                                </div>
 
-                            Belum ada riwayat pembayaran.
 
-                        </td>
+                                <div class="router-waves">
 
-                    </tr>
+                                    <span></span>
 
-                <?php endif; ?>
+                                    <span></span>
 
-                </tbody>
+                                    <span></span>
 
-            </table>
+                                </div>
 
-        </div>
+                            </div>
 
-    </div>
 
-</div>
+                            <div class="package-info">
 
+                                <span>
+                                    PAKET SAAT INI
+                                </span>
 
 
-<!-- QUICK ACTION -->
+                                <h4>
+                                    <?= e(
+                                        $paketNama
+                                    ); ?>
+                                </h4>
 
-<div class="col-lg-5">
 
-    <div class="dashboard-card">
+                                <div class="package-speed">
 
-        <div class="card-title">
+                                    <strong>
 
-            <h5>
-                Layanan Cepat
-            </h5>
+                                        <?= e(
+                                            $paketSpeed
+                                        ); ?>
 
-        </div>
+                                    </strong>
 
 
-        <div class="quick-action">
+                                    <span>
+                                        Kecepatan internet
+                                    </span>
 
+                                </div>
 
-            <a
-                href="billing.php"
-                class="quick-btn"
-            >
 
-                <i class="bi bi-receipt"></i>
+                                <?php if (
+                                    $paketHarga > 0
+                                ): ?>
 
-                Tagihan
+                                    <div class="package-price">
 
-            </a>
+                                        <strong>
 
+                                            <?= rupiah(
+                                                $paketHarga
+                                            ); ?>
 
-            <a
-                href="speedtest.php"
-                class="quick-btn"
-            >
+                                        </strong>
 
-                <i class="bi bi-speedometer2"></i>
 
-                Speed Test
+                                        <span>
+                                            / bulan
+                                        </span>
 
-            </a>
+                                    </div>
 
+                                <?php endif; ?>
 
-            <a
-                href="complaint_create.php"
-                class="quick-btn"
-            >
+                            </div>
 
-                <i class="bi bi-exclamation-triangle"></i>
 
-                Lapor Gangguan
+                            <a
+                                href="upgrade.php"
+                                class="full-outline-button"
+                            >
 
-            </a>
+                                <i class="bi bi-arrow-up-circle"></i>
 
+                                Upgrade Paket
 
-            <a
-                href="chat.php"
-                class="quick-btn"
-            >
+                                <i class="bi bi-arrow-right"></i>
 
-                <i class="bi bi-chat-dots"></i>
+                            </a>
 
-                Chat CS
+                        </div>
 
-            </a>
 
+                        <!-- NETWORK -->
 
-            <a
-                href="upgrade.php"
-                class="quick-btn"
-            >
+                        <div class="dashboard-card network-card">
 
-                <i class="bi bi-arrow-up-circle"></i>
 
-                Upgrade
+                            <div class="card-heading compact">
 
-            </a>
+                                <div>
 
+                                    <span class="card-kicker">
+                                        CONNECTIVITY
+                                    </span>
 
-            <a
-                href="service_request.php"
-                class="quick-btn"
-            >
+                                    <h3>
+                                        Status Jaringan
+                                    </h3>
 
-                <i class="bi bi-plus-circle"></i>
+                                </div>
 
-                Layanan Tambahan
 
-            </a>
+                                <span class="online-dot">
+                                    ONLINE
+                                </span>
 
-        </div>
+                            </div>
 
-    </div>
 
-</div>
+                            <div class="network-main">
 
-</div>
 
+                                <div class="network-check">
 
+                                    <i class="bi bi-check-lg"></i>
 
-<!-- =====================================================
-     MONITORING BANDWIDTH + CHAT
-===================================================== -->
+                                </div>
 
-<div class="col-lg-8">
 
-    <div class="dashboard-card bandwidth-card">
+                                <div>
 
-        <div class="card-title">
+                                    <strong>
+                                        Jaringan Normal
+                                    </strong>
 
-            <div>
-                <h5>Monitoring Bandwidth</h5>
-                <span>Pemakaian jaringan secara real-time</span>
-            </div>
+                                    <span>
+                                        Tidak ada gangguan
+                                        terdeteksi.
+                                    </span>
 
-            <span class="live-text">● LIVE</span>
+                                </div>
 
-        </div>
+                            </div>
 
-        <div class="bandwidth-chart">
-            <canvas id="bandwidthChart"></canvas>
-        </div>
 
-    </div>
+                            <div class="network-info">
 
-</div>
 
+                                <div>
 
-<!-- BANDWIDTH CHART -->
+                                    <i class="bi bi-broadcast-pin"></i>
 
-<div class="col-lg-8">
+                                    <span>
+                                        Koneksi stabil
+                                    </span>
 
-    <div class="dashboard-card">
+                                </div>
 
-        <div class="card-title">
 
-            <div>
+                                <div>
 
-                <h5>
-                    Monitoring Bandwidth
-                </h5>
+                                    <i class="bi bi-shield-check"></i>
+
+                                    <span>
+                                        Sistem aman
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+
+                            <a
+                                href="network_status.php"
+                                class="network-link"
+                            >
+
+                                Lihat detail jaringan
+
+                                <i class="bi bi-arrow-up-right"></i>
+
+                            </a>
+
+                        </div>
+
+
+                        <!-- HELP -->
+
+                        <div class="dashboard-card help-card">
+
+                            <div class="help-background"></div>
+
+
+                            <div class="help-content">
+
+
+                                <div class="help-icon">
+
+                                    <i class="bi bi-headset"></i>
+
+                                </div>
+
+
+                                <span class="card-kicker">
+                                    CUSTOMER SERVICE
+                                </span>
+
+
+                                <h3>
+                                    Butuh bantuan?
+                                </h3>
+
+
+                                <p>
+
+                                    Tim Customer Service siap
+                                    membantu masalah internet kamu.
+
+                                </p>
+
+
+                                <a
+                                    href="chat.php"
+                                    class="help-button"
+                                >
+
+                                    <i class="bi bi-chat-dots-fill"></i>
+
+                                    Chat Customer Service
+
+                                </a>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     QUICK SERVICES
+                ================================================== -->
+
+                <div class="section-title-row quick-title">
+
+                    <div>
+
+                        <span class="section-kicker">
+                            SHORTCUT
+                        </span>
+
+                        <h2>
+                            Layanan Cepat
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div class="quick-services">
+
+
+                    <a
+                        href="billing.php"
+                        class="quick-service"
+                    >
+
+                        <div class="quick-icon blue">
+
+                            <i class="bi bi-receipt-cutoff"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <strong>
+                                Tagihan
+                            </strong>
+
+                            <span>
+                                Bayar & cek tagihan
+                            </span>
+
+                        </div>
+
+
+                        <i class="bi bi-arrow-up-right"></i>
+
+                    </a>
+
+
+                    <a
+                        href="speedtest.php"
+                        class="quick-service"
+                    >
+
+                        <div class="quick-icon purple">
+
+                            <i class="bi bi-speedometer2"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <strong>
+                                Speed Test
+                            </strong>
+
+                            <span>
+                                Cek kecepatan internet
+                            </span>
+
+                        </div>
+
+
+                        <i class="bi bi-arrow-up-right"></i>
+
+                    </a>
+
+
+                    <a
+                        href="complaint.php"
+                        class="quick-service"
+                    >
+
+                        <div class="quick-icon orange">
+
+                            <i class="bi bi-tools"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <strong>
+                                Lapor Gangguan
+                            </strong>
+
+                            <span>
+                                Laporkan masalah jaringan
+                            </span>
+
+                        </div>
+
+
+                        <i class="bi bi-arrow-up-right"></i>
+
+                    </a>
+
+
+                    <a
+                        href="chat.php"
+                        class="quick-service"
+                    >
+
+                        <div class="quick-icon green">
+
+                            <i class="bi bi-chat-dots-fill"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <strong>
+                                Chat CS
+                            </strong>
+
+                            <span>
+                                Hubungi customer service
+                            </span>
+
+                        </div>
+
+
+                        <i class="bi bi-arrow-up-right"></i>
+
+                    </a>
+
+                </div>
+
+
+            <?php elseif (
+                $statusLangganan ===
+                'pending'
+            ): ?>
+
+
+                <!-- =================================================
+                     PENDING
+                ================================================== -->
+
+                <section class="state-card pending-state">
+
+
+                    <div class="state-icon">
+
+                        <i class="bi bi-hourglass-split"></i>
+
+                    </div>
+
+
+                    <span class="state-label">
+                        PENGAJUAN PEMASANGAN
+                    </span>
+
+
+                    <h2>
+                        Pengajuan kamu sedang diproses
+                    </h2>
+
+
+                    <p>
+
+                        Tim kami sedang memproses pengajuan
+                        pemasangan internet kamu. Pantau status
+                        pemasangan melalui halaman berikut.
+
+                    </p>
+
+
+                    <div class="state-steps">
+
+
+                        <div class="state-step done">
+
+                            <span>
+
+                                <i class="bi bi-check-lg"></i>
+
+                            </span>
+
+
+                            <div>
+
+                                <strong>
+                                    Pengajuan diterima
+                                </strong>
+
+                                <small>
+                                    Data kamu sudah tercatat.
+                                </small>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="state-step active">
+
+                            <span>
+
+                                <i class="bi bi-clock"></i>
+
+                            </span>
+
+
+                            <div>
+
+                                <strong>
+                                    Proses pemasangan
+                                </strong>
+
+                                <small>
+                                    Menunggu proses dari tim teknisi.
+                                </small>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="state-step">
+
+                            <span>
+
+                                <i class="bi bi-wifi"></i>
+
+                            </span>
+
+
+                            <div>
+
+                                <strong>
+                                    Aktivasi layanan
+                                </strong>
+
+                                <small>
+                                    Layanan akan aktif setelah instalasi selesai.
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <a
+                        href="installation.php"
+                        class="state-button"
+                    >
+
+                        <i class="bi bi-geo-alt-fill"></i>
+
+                        Lihat Status Pemasangan
+
+                    </a>
+
+                </section>
+
+
+            <?php elseif (
+                $statusLangganan ===
+                'suspended'
+            ): ?>
+
+
+                <!-- SUSPENDED -->
+
+                <section class="state-card suspended-state">
+
+
+                    <div class="state-icon">
+
+                        <i class="bi bi-pause-circle-fill"></i>
+
+                    </div>
+
+
+                    <span class="state-label">
+                        LAYANAN DITANGGUHKAN
+                    </span>
+
+
+                    <h2>
+                        Layanan internet sedang ditangguhkan
+                    </h2>
+
+
+                    <p>
+
+                        Untuk informasi lebih lanjut mengenai
+                        status layanan kamu, silakan hubungi
+                        Customer Service.
+
+                    </p>
+
+
+                    <a
+                        href="chat.php"
+                        class="state-button"
+                    >
+
+                        <i class="bi bi-headset"></i>
+
+                        Hubungi Customer Service
+
+                    </a>
+
+                </section>
+
+
+            <?php elseif (
+                $statusLangganan ===
+                'terminated'
+            ): ?>
+
+
+                <!-- TERMINATED -->
+
+                <section class="state-card terminated-state">
+
+
+                    <div class="state-icon">
+
+                        <i class="bi bi-x-circle-fill"></i>
+
+                    </div>
+
+
+                    <span class="state-label">
+                        LAYANAN BERAKHIR
+                    </span>
+
+
+                    <h2>
+                        Layanan internet sudah berakhir
+                    </h2>
+
+
+                    <p>
+
+                        Hubungi Customer Service untuk mendapatkan
+                        informasi mengenai layanan internet kamu.
+
+                    </p>
+
+
+                    <a
+                        href="chat.php"
+                        class="state-button"
+                    >
+
+                        <i class="bi bi-headset"></i>
+
+                        Hubungi Customer Service
+
+                    </a>
+
+                </section>
+
+
+            <?php else: ?>
+
+
+                <!-- =================================================
+                     BELUM BERLANGGANAN
+                ================================================== -->
+
+                <section class="state-card subscription-state">
+
+
+                    <div class="state-visual">
+
+
+                        <div class="floating-icon icon-one">
+
+                            <i class="bi bi-wifi"></i>
+
+                        </div>
+
+
+                        <div class="floating-icon icon-two">
+
+                            <i class="bi bi-lightning-charge-fill"></i>
+
+                        </div>
+
+
+                        <div class="subscription-main-icon">
+
+                            <i class="bi bi-router-fill"></i>
+
+                        </div>
+
+                    </div>
+
+
+                    <span class="state-label">
+                        BELUM BERLANGGANAN
+                    </span>
+
+
+                    <h2>
+                        Siap menikmati internet yang lebih nyaman?
+                    </h2>
+
+
+                    <p>
+
+                        Pilih paket WiFi yang sesuai kebutuhan kamu.
+                        Setelah memilih paket, lanjutkan proses
+                        pemasangan melalui dashboard.
+
+                    </p>
+
+
+                    <a
+                        href="langganan.php"
+                        class="state-button"
+                    >
+
+                        <i class="bi bi-box-seam-fill"></i>
+
+                        Pilih Paket Internet
+
+                        <i class="bi bi-arrow-right"></i>
+
+                    </a>
+
+                </section>
+
+            <?php endif; ?>
+
+
+            <!-- =================================================
+                 FOOTER
+            ================================================== -->
+
+            <footer class="dashboard-footer">
 
                 <span>
-                    Pemakaian jaringan secara real-time
+
+                    © <?= date('Y'); ?>
+
+                    WiFi Management
+
                 </span>
 
-            </div>
 
-            <span class="live-text">
+                <span>
+                    Customer Portal
+                </span>
 
-                ● LIVE
+            </footer>
 
-            </span>
 
         </div>
 
-
-        <canvas
-            id="bandwidthChart"
-            height="100"
-        ></canvas>
-
-    </div>
+    </main>
 
 </div>
 
 
-
-<!-- CUSTOMER SERVICE -->
-
-<div class="col-lg-4">
-
-    <div class="dashboard-card">
-
-        <div class="card-title">
-
-            <h5>
-                Customer Service
-            </h5>
-
-            <span class="online-text">
-                ● Online
-            </span>
-
-        </div>
-
-
-        <div class="chat-preview">
-
-            <div class="chat-avatar">
-
-                <i class="bi bi-headset"></i>
-
-            </div>
-
-            <div>
-
-                <strong>
-                    Customer Service
-                </strong>
-
-                <p>
-                    👋 Halo! Ada yang bisa kami bantu?
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div class="quick-action">
-
-
-            <a
-                href="chat.php?topic=wifi"
-                class="quick-btn"
-            >
-
-                <i class="bi bi-wifi"></i>
-
-                Reset WiFi
-
-            </a>
-
-
-            <a
-                href="chat.php?topic=installation"
-                class="quick-btn"
-            >
-
-                <i class="bi bi-calendar-check"></i>
-
-                Instalasi
-
-            </a>
-
-        </div>
-
-
-        <a
-            href="chat.php"
-            class="btn-chat"
-        >
-
-            <i class="bi bi-chat-dots"></i>
-
-            Chat dengan CS
-
-        </a>
-
-    </div>
-
-</div>
-
-</div>
-
-
-
-<!-- =====================================================
-     ACCOUNT
-===================================================== -->
-
-<div class="dashboard-card account-card">
-
-    <div class="card-title">
-
-        <div>
-
-            <h5>
-                Informasi Akun
-            </h5>
-
-            <span>
-                Data customer terdaftar
-            </span>
-
-        </div>
-
-
-        <a
-            href="profile.php"
-            class="btn-light-custom account-button"
-        >
-
-            Profile
-
-        </a>
-
-    </div>
-
-
-    <div class="row g-3">
-
-
-        <div class="col-md-3">
-
-            <small>
-                Nama
-            </small>
-
-            <div class="account-value">
-
-                <?= htmlspecialchars($nama) ?>
-
-            </div>
-
-        </div>
-
-
-        <div class="col-md-3">
-
-            <small>
-                Customer ID
-            </small>
-
-            <div class="account-value">
-
-                <?= htmlspecialchars(
-                    $customer['kode_pelanggan'] ?? '-'
-                ) ?>
-
-            </div>
-
-        </div>
-
-
-        <div class="col-md-3">
-
-            <small>
-                Email
-            </small>
-
-            <div class="account-value">
-
-                <?= htmlspecialchars(
-                    $customer['email'] ?? '-'
-                ) ?>
-
-            </div>
-
-        </div>
-
-
-        <div class="col-md-3">
-
-            <small>
-                Nomor HP
-            </small>
-
-            <div class="account-value">
-
-                <?= htmlspecialchars(
-                    $customer['no_hp'] ?? '-'
-                ) ?>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-</div>
-
-</main>
-
-
-
-<!-- =====================================================
-     CHART JS
-===================================================== -->
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js -->
+
+<script
+    src="https://cdn.jsdelivr.net/npm/chart.js"
+></script>
 
 
 <script>
 
-const chartElement =
-    document.getElementById('bandwidthChart');
-
-if (chartElement) {
-
-    const labels = [
-        '10:00',
-        '10:05',
-        '10:10',
-        '10:15',
-        '10:20',
-        '10:25',
-        '10:30'
-    ];
-
-    const downloadData = [
-        45,
-        58,
-        72,
-        65,
-        81,
-        76,
-        87
-    ];
-
-    const uploadData = [
-        8,
-        11,
-        13,
-        10,
-        16,
-        14,
-        18
-    ];
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
 
 
-    new window.Chart(chartElement, {
+        /*
+        |--------------------------------------------------------------------------
+        | BANDWIDTH CHART
+        |--------------------------------------------------------------------------
+        */
 
-        type: 'line',
+        const chartElement =
+            document.getElementById(
+                'bandwidthChart'
+            );
 
-        data: {
 
-            labels: labels,
+        if (chartElement) {
 
-            datasets: [
+            const ctx =
+                chartElement.getContext(
+                    '2d'
+                );
 
+
+            const gradientDownload =
+                ctx.createLinearGradient(
+                    0,
+                    0,
+                    0,
+                    260
+                );
+
+
+            gradientDownload.addColorStop(
+                0,
+                'rgba(37, 99, 235, 0.20)'
+            );
+
+
+            gradientDownload.addColorStop(
+                1,
+                'rgba(37, 99, 235, 0)'
+            );
+
+
+            const gradientUpload =
+                ctx.createLinearGradient(
+                    0,
+                    0,
+                    0,
+                    260
+                );
+
+
+            gradientUpload.addColorStop(
+                0,
+                'rgba(139, 92, 246, 0.12)'
+            );
+
+
+            gradientUpload.addColorStop(
+                1,
+                'rgba(139, 92, 246, 0)'
+            );
+
+
+            new Chart(
+                ctx,
                 {
 
-                    label: 'Download Mbps',
+                    type: 'line',
 
-                    data: downloadData,
 
-                    borderWidth: 2,
+                    data: {
 
-                    tension: .4,
+                        labels: [
 
-                    fill: false
+                            '10:00',
+                            '10:05',
+                            '10:10',
+                            '10:15',
+                            '10:20',
+                            '10:25',
+                            '10:30',
+                            '10:35',
+                            '10:40',
+                            '10:45'
 
-                },
+                        ],
 
-                {
 
-                    label: 'Upload Mbps',
+                        datasets: [
 
-                    data: uploadData,
 
-                    borderWidth: 2,
+                            {
 
-                    tension: .4,
+                                label:
+                                    'Download',
 
-                    fill: false
 
-                }
+                                data: [
 
-            ]
+                                    42,
+                                    56,
+                                    51,
+                                    68,
+                                    61,
+                                    77,
+                                    72,
+                                    81,
+                                    76,
+                                    <?= (float) $downloadMbps; ?>
 
-        },
+                                ],
 
-        options: {
 
-            responsive: true,
+                                borderColor:
+                                    '#2563eb',
 
-            maintainAspectRatio: false,
 
-            plugins: {
+                                backgroundColor:
+                                    gradientDownload,
 
-                legend: {
 
-                    labels: {
+                                borderWidth:
+                                    2.5,
 
-                        font: {
-                            size: 10
-                        }
 
-                    }
+                                pointRadius:
+                                    0,
 
-                }
 
-            },
+                                pointHoverRadius:
+                                    5,
 
-            scales: {
 
-                x: {
+                                tension:
+                                    0.42,
 
-                    ticks: {
 
-                        font: {
-                            size: 9
-                        }
+                                fill:
+                                    true
+
+                            },
+
+
+                            {
+
+                                label:
+                                    'Upload',
+
+
+                                data: [
+
+                                    9,
+                                    12,
+                                    11,
+                                    14,
+                                    13,
+                                    16,
+                                    14,
+                                    17,
+                                    15,
+                                    <?= (float) $uploadMbps; ?>
+
+                                ],
+
+
+                                borderColor:
+                                    '#8b5cf6',
+
+
+                                backgroundColor:
+                                    gradientUpload,
+
+
+                                borderWidth:
+                                    2,
+
+
+                                pointRadius:
+                                    0,
+
+
+                                pointHoverRadius:
+                                    5,
+
+
+                                tension:
+                                    0.42,
+
+
+                                fill:
+                                    true
+
+                            }
+
+                        ]
 
                     },
 
-                    grid: {
-                        display: false
-                    }
 
-                },
+                    options: {
 
-                y: {
+                        responsive:
+                            true,
 
-                    beginAtZero: true,
 
-                    ticks: {
+                        maintainAspectRatio:
+                            false,
 
-                        font: {
-                            size: 9
+
+                        interaction: {
+
+                            intersect:
+                                false,
+
+                            mode:
+                                'index'
+
+                        },
+
+
+                        plugins: {
+
+
+                            legend: {
+
+                                display:
+                                    true,
+
+
+                                position:
+                                    'top',
+
+
+                                align:
+                                    'end',
+
+
+                                labels: {
+
+                                    usePointStyle:
+                                        true,
+
+
+                                    pointStyle:
+                                        'circle',
+
+
+                                    padding:
+                                        18,
+
+
+                                    boxWidth:
+                                        7,
+
+
+                                    font: {
+
+                                        family:
+                                            'Inter',
+
+                                        size:
+                                            10,
+
+                                        weight:
+                                            '600'
+
+                                    }
+
+                                }
+
+                            },
+
+
+                            tooltip: {
+
+                                backgroundColor:
+                                    '#172033',
+
+
+                                titleColor:
+                                    '#ffffff',
+
+
+                                bodyColor:
+                                    '#dbe5f4',
+
+
+                                padding:
+                                    12,
+
+
+                                cornerRadius:
+                                    10,
+
+
+                                displayColors:
+                                    true
+
+                            }
+
+                        },
+
+
+                        scales: {
+
+
+                            x: {
+
+                                grid: {
+
+                                    display:
+                                        false
+
+                                },
+
+
+                                border: {
+
+                                    display:
+                                        false
+
+                                },
+
+
+                                ticks: {
+
+                                    color:
+                                        '#94a3b8',
+
+
+                                    font: {
+
+                                        family:
+                                            'Inter',
+
+                                        size:
+                                            9
+
+                                    }
+
+                                }
+
+                            },
+
+
+                            y: {
+
+                                beginAtZero:
+                                    true,
+
+
+                                suggestedMax:
+                                    100,
+
+
+                                grid: {
+
+                                    color:
+                                        'rgba(148,163,184,.12)',
+
+
+                                    drawTicks:
+                                        false
+
+                                },
+
+
+                                border: {
+
+                                    display:
+                                        false
+
+                                },
+
+
+                                ticks: {
+
+                                    color:
+                                        '#94a3b8',
+
+
+                                    padding:
+                                        8,
+
+
+                                    font: {
+
+                                        family:
+                                            'Inter',
+
+                                        size:
+                                            9
+
+                                    },
+
+
+                                    callback:
+                                        function (
+                                            value
+                                        ) {
+
+                                            return value +
+                                                ' Mbps';
+
+                                        }
+
+                                }
+
+                            }
+
                         }
 
                     }
 
                 }
-
-            }
-
+            );
         }
 
-    });
 
-}
+        /*
+        |--------------------------------------------------------------------------
+        | MOBILE SIDEBAR
+        |--------------------------------------------------------------------------
+        */
+
+        const sidebar =
+            document.getElementById(
+                'sidebar'
+            );
+
+
+        const overlay =
+            document.getElementById(
+                'sidebarOverlay'
+            );
+
+
+        const mobileButton =
+            document.getElementById(
+                'mobileMenuButton'
+            );
+
+
+        const closeButton =
+            document.getElementById(
+                'sidebarClose'
+            );
+
+
+        function openSidebar()
+        {
+
+            if (!sidebar) {
+                return;
+            }
+
+
+            sidebar.classList.add(
+                'show'
+            );
+
+
+            if (overlay) {
+
+                overlay.classList.add(
+                    'show'
+                );
+            }
+
+
+            document.body.classList.add(
+                'sidebar-open'
+            );
+        }
+
+
+        function closeSidebar()
+        {
+
+            if (!sidebar) {
+                return;
+            }
+
+
+            sidebar.classList.remove(
+                'show'
+            );
+
+
+            if (overlay) {
+
+                overlay.classList.remove(
+                    'show'
+                );
+            }
+
+
+            document.body.classList.remove(
+                'sidebar-open'
+            );
+        }
+
+
+        if (mobileButton) {
+
+            mobileButton.addEventListener(
+                'click',
+                openSidebar
+            );
+        }
+
+
+        if (closeButton) {
+
+            closeButton.addEventListener(
+                'click',
+                closeSidebar
+            );
+        }
+
+
+        if (overlay) {
+
+            overlay.addEventListener(
+                'click',
+                closeSidebar
+            );
+        }
+
+    }
+);
 
 </script>
 

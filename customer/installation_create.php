@@ -1,70 +1,314 @@
 <?php
 
+session_start();
+
 require_once "../config/database.php";
 require_once "../config/auth.php";
 
 requireRole('customer');
 
-$userId = $_SESSION['user_id'];
 
-$stmt = $conn->prepare(
-    "SELECT id, nama, alamat
-     FROM customers
-     WHERE user_id = ?"
-);
+/*
+|--------------------------------------------------------------------------
+| CEK LOGIN
+|--------------------------------------------------------------------------
+*/
+
+$userId = (int) ($_SESSION['user_id'] ?? 0);
+
+if ($userId <= 0) {
+    header("Location: ../login.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL DATA CUSTOMER
+|--------------------------------------------------------------------------
+*/
+
+$stmt = $conn->prepare("
+    SELECT
+        id,
+        nama,
+        no_hp,
+        alamat,
+        paket_id,
+        status_langganan
+    FROM customers
+    WHERE user_id = ?
+    LIMIT 1
+");
+
+if (!$stmt) {
+    die("Query customer gagal: " . $conn->error);
+}
 
 $stmt->bind_param("i", $userId);
 $stmt->execute();
 
 $customer = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-$packages = $conn->query(
-    "SELECT *
-     FROM instalasi
-     WHERE status = 'active'
-     ORDER BY speed_mbps"
-);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (!$customer) {
+    die("Data customer tidak ditemukan.");
+}
 
-    $packageId =
-        intval($_POST['id_paket']);
 
-    $alamat =
-        trim($_POST['alamat']);
+$customerId = (int) $customer['id'];
 
-    $date =
-        $_POST['tgl_permintaan'];
 
-    $code =
-        "INS" . date("YmdHis") . rand(10, 99);
+/*
+|--------------------------------------------------------------------------
+| CEK STATUS LANGGANAN
+|--------------------------------------------------------------------------
+*/
 
-    $stmt = $conn->prepare(
-        "INSERT INTO instalasi
-        (
-            id_customer,
-            id_paket,
-            kode_pelanggan,
-            alamat,
-            tgl_permintaan
-        )
-        VALUES (?, ?, ?, ?, ?)"
-    );
+$statusLangganan =
+    $customer['status_langganan']
+    ?? 'belum_berlangganan';
 
-    $stmt->bind_param(
-        "iisss",
-        $customer['id'],
-        $packageId,
-        $code,
-        $address,
-        $date
-    );
+
+/*
+|--------------------------------------------------------------------------
+| JIKA SUDAH AKTIF
+|--------------------------------------------------------------------------
+*/
+
+if ($statusLangganan === 'active') {
+
+    header("Location: dashboard.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL PAKET WIFI
+|--------------------------------------------------------------------------
+*/
+
+$packages = [];
+
+$stmt = $conn->prepare("
+    SELECT
+        id,
+        nama_paket,
+        kecepatan,
+        harga,
+        deskripsi
+    FROM paket_wifi
+    WHERE status = 'active'
+    ORDER BY harga ASC
+");
+
+if ($stmt) {
 
     $stmt->execute();
 
-    header("Location: instalasi.php");
-    exit;
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $packages[] = $row;
+    }
+
+    $stmt->close();
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| PROSES PENGAJUAN
+|--------------------------------------------------------------------------
+*/
+
+$error = '';
+$success = '';
+
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $packageId = (int) ($_POST['paket_id'] ?? 0);
+
+    $alamat = trim(
+        $_POST['alamat_pemasangan'] ?? ''
+    );
+
+    $tanggal =
+        $_POST['tanggal_instalasi'] ?? '';
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI
+    |--------------------------------------------------------------------------
+    */
+
+    if ($packageId <= 0) {
+
+        $error = "Silakan pilih paket WiFi.";
+
+    } elseif ($alamat === '') {
+
+        $error = "Alamat pemasangan wajib diisi.";
+
+    } elseif ($tanggal === '') {
+
+        $error = "Tanggal instalasi wajib dipilih.";
+
+    } elseif ($tanggal < date('Y-m-d')) {
+
+        $error = "Tanggal instalasi tidak boleh sebelum hari ini.";
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CEK PENGAJUAN YANG MASIH BERJALAN
+    |--------------------------------------------------------------------------
+    */
+
+    if ($error === '') {
+
+        $stmt = $conn->prepare("
+            SELECT id
+            FROM pengajuan_pemasangan
+            WHERE customer_id = ?
+            AND status IN (
+                'diajukan',
+                'verifikasi',
+                'disetujui',
+                'dijadwalkan',
+                'instalasi'
+            )
+            LIMIT 1
+        ");
+
+        if ($stmt) {
+
+            $stmt->bind_param(
+                "i",
+                $customerId
+            );
+
+            $stmt->execute();
+
+            $existing =
+                $stmt->get_result()->fetch_assoc();
+
+            $stmt->close();
+
+            if ($existing) {
+
+                $error =
+                    "Kamu masih memiliki pengajuan pemasangan yang sedang diproses.";
+
+            }
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIMPAN PENGAJUAN
+    |--------------------------------------------------------------------------
+    */
+
+    if ($error === '') {
+
+        $stmt = $conn->prepare("
+            INSERT INTO pengajuan_pemasangan
+            (
+                customer_id,
+                paket_id,
+                alamat_pemasangan,
+                status,
+                catatan
+            )
+            VALUES (?, ?, ?, 'diajukan', ?)
+        ");
+
+        if (!$stmt) {
+
+            $error =
+                "Gagal menyiapkan pengajuan: "
+                . $conn->error;
+
+        } else {
+
+            $catatan =
+                "Tanggal instalasi yang diinginkan: "
+                . $tanggal;
+
+
+            $stmt->bind_param(
+                "iiss",
+                $customerId,
+                $packageId,
+                $alamat,
+                $catatan
+            );
+
+
+            if ($stmt->execute()) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | UBAH STATUS CUSTOMER
+                |--------------------------------------------------------------------------
+                */
+
+                $updateCustomer = $conn->prepare("
+                    UPDATE customers
+                    SET
+                        status_langganan = 'pending',
+                        paket_id = ?
+                    WHERE id = ?
+                ");
+
+                if ($updateCustomer) {
+
+                    $updateCustomer->bind_param(
+                        "ii",
+                        $packageId,
+                        $customerId
+                    );
+
+                    $updateCustomer->execute();
+
+                    $updateCustomer->close();
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | SELESAI
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt->close();
+
+                header(
+                    "Location: installation.php?success=1"
+                );
+
+                exit;
+
+            } else {
+
+                $error =
+                    "Pengajuan gagal disimpan: "
+                    . $stmt->error;
+
+                $stmt->close();
+            }
+        }
+    }
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -73,102 +317,282 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Pengajuan Pemasangan</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<link
-href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-rel="stylesheet"
->
+    <title>
+        Pengajuan Pemasangan WiFi
+    </title>
+
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
 
 </head>
 
-<body>
 
-<div class="container py-4">
+<body class="bg-light">
 
-<h3>
-📡 Pengajuan Pemasangan WiFi
-</h3>
 
-<div class="card mt-3">
+<div class="container py-5">
 
-<div class="card-body">
+    <div class="row justify-content-center">
 
-<form method="POST">
+        <div class="col-lg-8">
 
-<label class="form-label">
-Pilih Paket
-</label>
 
-<select
-name="package_id"
-class="form-select mb-3"
-required
->
+            <!-- HEADER -->
 
-<option value="">
--- Pilih Paket --
-</option>
+            <div class="mb-4">
 
-<?php while ($package = $packages->fetch_assoc()): ?>
+                <h3 class="fw-bold">
 
-<option value="<?= $package['id'] ?>">
+                    <i class="bi bi-wifi"></i>
 
-<?= htmlspecialchars($package['package_name']) ?>
+                    Pengajuan Pemasangan WiFi
 
--
-<?= $package['speed_mbps'] ?> Mbps
+                </h3>
 
--
-Rp <?= number_format($package['price'], 0, ',', '.') ?>
+                <p class="text-muted">
 
-</option>
+                    Silakan pilih paket dan isi data
+                    pemasangan WiFi.
 
-<?php endwhile; ?>
+                </p>
 
-</select>
+            </div>
 
-<label>
-Alamat Pemasangan
-</label>
 
-<textarea
-name="alamat"
-class="form-control mb-3"
-required
-><?= htmlspecialchars($customer['alamat']) ?></textarea>
+            <!-- ERROR -->
 
-<label>
-Tanggal yang diinginkan
-</label>
+            <?php if ($error): ?>
 
-<input
-type="date"
-name="requested_date"
-class="form-control mb-3"
-required
->
+                <div
+                    class="alert alert-danger"
+                    role="alert"
+                >
 
-<button class="btn btn-primary">
-Kirim Pengajuan
-</button>
+                    <i class="bi bi-exclamation-circle"></i>
 
-<a
-href="dashboard.php"
-class="btn btn-secondary"
->
-Kembali
-</a>
+                    <?= htmlspecialchars($error) ?>
 
-</form>
+                </div>
+
+            <?php endif; ?>
+
+
+            <!-- FORM -->
+
+            <div class="card shadow-sm border-0">
+
+                <div class="card-body p-4">
+
+
+                    <form method="POST">
+
+
+                        <!-- CUSTOMER -->
+
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+
+                                Nama Customer
+
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                value="<?= htmlspecialchars($customer['nama']) ?>"
+                                readonly
+                            >
+
+                        </div>
+
+
+                        <!-- PAKET -->
+
+                        <div class="mb-4">
+
+                            <label
+                                class="form-label fw-semibold"
+                            >
+
+                                Pilih Paket WiFi
+
+                            </label>
+
+
+                            <select
+                                name="paket_id"
+                                class="form-select"
+                                required
+                            >
+
+                                <option value="">
+
+                                    -- Pilih Paket --
+
+                                </option>
+
+
+                                <?php foreach ($packages as $package): ?>
+
+                                    <option
+                                        value="<?= $package['id'] ?>"
+                                        <?= (
+                                            isset($_POST['paket_id'])
+                                            && $_POST['paket_id']
+                                            == $package['id']
+                                        )
+                                        ? 'selected'
+                                        : ''
+                                        ?>
+                                    >
+
+                                        <?= htmlspecialchars(
+                                            $package['nama_paket']
+                                        ) ?>
+
+                                        -
+
+                                        <?= htmlspecialchars(
+                                            $package['kecepatan']
+                                        ) ?>
+
+                                        -
+
+                                        <?= rupiah(
+                                            $package['harga']
+                                        ) ?>
+
+                                    </option>
+
+                                <?php endforeach; ?>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- ALAMAT -->
+
+                        <div class="mb-4">
+
+                            <label
+                                class="form-label fw-semibold"
+                            >
+
+                                Alamat Pemasangan
+
+                            </label>
+
+
+                            <textarea
+                                name="alamat_pemasangan"
+                                class="form-control"
+                                rows="4"
+                                placeholder="Masukkan alamat lengkap pemasangan WiFi"
+                                required
+                            ><?= htmlspecialchars(
+                                $_POST['alamat_pemasangan']
+                                ?? $customer['alamat']
+                                ?? ''
+                            ) ?></textarea>
+
+                        </div>
+
+
+                        <!-- TANGGAL -->
+
+                        <div class="mb-4">
+
+                            <label
+                                class="form-label fw-semibold"
+                            >
+
+                                Tanggal Instalasi yang Diinginkan
+
+                            </label>
+
+
+                            <input
+                                type="date"
+                                name="tanggal_instalasi"
+                                class="form-control"
+                                min="<?= date('Y-m-d') ?>"
+                                value="<?= htmlspecialchars(
+                                    $_POST['tanggal_instalasi']
+                                    ?? ''
+                                ) ?>"
+                                required
+                            >
+
+
+                            <small class="text-muted">
+
+                                Tanggal ini merupakan
+                                permintaan awal dan dapat
+                                berubah sesuai jadwal teknisi.
+
+                            </small>
+
+                        </div>
+
+
+                        <!-- BUTTON -->
+
+                        <div class="d-flex gap-2">
+
+                            <button
+                                type="submit"
+                                class="btn btn-primary"
+                            >
+
+                                <i class="bi bi-send"></i>
+
+                                Kirim Pengajuan
+
+                            </button>
+
+
+                            <a
+                                href="dashboard.php"
+                                class="btn btn-secondary"
+                            >
+
+                                Kembali
+
+                            </a>
+
+                        </div>
+
+
+                    </form>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </div>
 
 </div>
 
-</div>
-
-</div>
 
 </body>
 

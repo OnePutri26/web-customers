@@ -12,7 +12,14 @@ $user_id = $_SESSION['user_id'];
 
 // Ambil data user
 $stmt = $conn->prepare("
-    SELECT id, username, email, telephone, alamat, role
+    SELECT id, 
+        nama,
+        username,
+        email,
+        telephone,
+        password,
+        role,
+        status
     FROM users
     WHERE id = ?
     LIMIT 1

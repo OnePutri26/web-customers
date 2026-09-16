@@ -15,7 +15,14 @@ $message = "";
 $error = "";
 
 $stmt = $conn->prepare("
-    SELECT id, username, email, telephone, alamat, role
+    SELECT id, 
+        nama,
+        username,
+        email,
+        telephone,
+        password,
+        role,
+        status
     FROM users
     WHERE id = ?
     LIMIT 1
@@ -38,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username  = trim($_POST['username'] ?? '');
     $email     = trim($_POST['email'] ?? '');
     $telephone = trim($_POST['telephone'] ?? '');
-    $alamat    = trim($_POST['alamat'] ?? '');
+    $nama    = trim($_POST['nama'] ?? '');
 
 
     // Validasi
@@ -67,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             SET username = ?,
                 email = ?,
                 telephone = ?,
-                alamat = ?
+                nama = ?
             WHERE id = ?
         ");
 
@@ -76,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $username,
             $email,
             $telephone,
-            $alamat,
+            $nama,
             $user_id
         );
 
@@ -93,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user['username']  = $username;
             $user['email']     = $email;
             $user['telephone'] = $telephone;
-            $user['alamat']    = $alamat;
+            $user['nama']    = $nama;
 
         } else {
 
