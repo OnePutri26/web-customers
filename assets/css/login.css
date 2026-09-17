@@ -490,6 +490,8 @@ body {
         grid-template-columns: 1fr;
 
         max-width: 480px;
+
+        border-radius: 20px;
     }
 
     .login-info {
@@ -498,6 +500,21 @@ body {
 
     .login-card {
         padding: 40px 30px;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-card {
+        padding: 30px 20px;
+    }
+
+    .login-header h2 {
+        font-size: 22px;
+    }
+
+    .login-wrapper {
+        align-items: flex-start;
+        padding-top: 24px;
     }
 }
 

@@ -282,3 +282,53 @@ body:not(.dashboard-page) :where(input, select, textarea, button) {
         border-radius: 14px;
     }
 }
+
+/* Keep shared customer pages usable on narrow screens. */
+@media (max-width: 768px) {
+    :where(.profile-navbar, .edit-navbar, .subscription-navbar, .renewal-navbar,
+        .installation-navbar, .payment-navbar, .top-header) {
+        min-height: 64px;
+    }
+
+    :where(.profile-container, .edit-container, .subscription-container, .renewal-container,
+        .installation-container, .payment-container, .main-container, .content-container) {
+        width: calc(100% - 24px);
+        padding-top: 20px;
+        padding-bottom: 32px;
+    }
+
+    :where(.page-header, .header, .topbar) {
+        padding-right: 16px;
+        padding-left: 16px;
+    }
+
+    :where(.form-card, .content-card, .payment-card, .profile-card, .settings-card,
+        .package-card, .subscription-card, .installation-card, .dashboard-card) {
+        padding: 18px;
+    }
+
+    :where(.row, .form-row) {
+        --bs-gutter-x: 1rem;
+    }
+
+    :where(.btn, .btn-primary, .btn-submit, .btn-add, .btn-pay, .btn-confirm,
+        .btn-upgrade, .hero-button, .submit-btn) {
+        min-height: 42px;
+    }
+
+    :where(table) {
+        min-width: 620px;
+    }
+}
+
+@media (max-width: 480px) {
+    :where(.form-card, .content-card, .payment-card, .profile-card, .settings-card,
+        .package-card, .subscription-card, .installation-card, .dashboard-card) {
+        padding: 15px;
+    }
+
+    :where(.content h1, .content h2, .page-content h1, .page-content h2,
+        .billing-header h1, .billing-header h2) {
+        font-size: 21px;
+    }
+}

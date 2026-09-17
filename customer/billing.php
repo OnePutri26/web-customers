@@ -144,6 +144,7 @@ $statusLabel = match ($statusTagihan) {
 <html lang="id">
 
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <meta charset="UTF-8">
 
@@ -975,7 +976,7 @@ $statusLabel = match ($statusTagihan) {
                     || $statusTagihan === 'pending'
                 ): ?>
 
-                    <a
+                    <a 
                         href="payment.php?id=<?= urlencode($tagihan['id']) ?>"
                         class="btn-payment"
                     >

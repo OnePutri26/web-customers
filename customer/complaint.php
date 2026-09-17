@@ -1,468 +1,616 @@
 <?php
 
+session_start();
+
 require_once "../config/database.php";
 require_once "../config/auth.php";
 
 requireRole('customer');
 
-/* =====================================================
-   SESSION USER
-===================================================== */
+date_default_timezone_set('Asia/Jakarta');
 
-$userId = (int) ($_SESSION['user_id'] ?? 0);
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-if ($userId <= 0) {
-    die("Session user tidak valid.");
-}
 
-/* =====================================================
-   HELPER
-===================================================== */
+/*
+|--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
 
 function e($value): string
 {
     return htmlspecialchars(
-        (string) ($value ?? ''),
+        (string) $value,
         ENT_QUOTES,
         'UTF-8'
     );
 }
 
-/**
- * Menentukan class CSS berdasarkan status complaint
- */
+
+function formatTanggal($tanggal): string
+{
+    if (empty($tanggal)) {
+        return '-';
+    }
+
+    return date('d M Y, H:i', strtotime($tanggal));
+}
+
+
 function statusClass($status): string
 {
-    $status = strtolower(trim((string) ($status ?? '')));
+    $status = strtolower(trim((string) $status));
 
     return match ($status) {
-
-        'open',
-        'baru',
-        'pending'
-            => 'status-open',
-
-        'process',
-        'proses',
-        'on progress',
-        'in progress'
-            => 'status-process',
-
-        'closed',
-        'selesai',
-        'resolved'
-            => 'status-closed',
-
-        default
-            => 'status-default'
+        'open', 'baru' => 'status-open',
+        'process', 'proses', 'diproses' => 'status-process',
+        'closed', 'selesai' => 'status-closed',
+        default => 'status-default',
     };
 }
 
-/**
- * Menentukan class CSS berdasarkan prioritas complaint
- */
-function priorityClass($priority): string
+
+function statusLabel($status): string
 {
-    $priority = strtolower(trim((string) ($priority ?? '')));
+    $status = strtolower(trim((string) $status));
 
-    return match ($priority) {
-
-        'high',
-        'tinggi'
-            => 'priority-high',
-
-        'medium',
-        'sedang',
-        'normal'
-            => 'priority-medium',
-
-        'low',
-        'rendah'
-            => 'priority-low',
-
-        default
-            => 'priority-default'
+    return match ($status) {
+        'open', 'baru' => 'Baru',
+        'process', 'proses', 'diproses' => 'Diproses',
+        'closed', 'selesai' => 'Selesai',
+        default => ucfirst(str_replace('_', ' ', $status)),
     };
 }
 
-/* =====================================================
-   DATA CUSTOMER
-===================================================== */
 
-$stmtCustomer = $conn->prepare("
-    SELECT *
-    FROM customers
-    WHERE user_id = ?
+function normalizeSubscriptionStatus($status): string
+{
+    $status = strtolower(trim((string) $status));
+
+    return match ($status) {
+        'aktif', 'active' => 'active',
+        'pending', 'proses', 'menunggu_pemasangan' => 'pending',
+        'belum_berlangganan' => 'belum_berlangganan',
+        default => $status,
+    };
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN
+|--------------------------------------------------------------------------
+*/
+
+$userId = (int) ($_SESSION['user_id'] ?? 0);
+
+if ($userId <= 0) {
+    header("Location: ../login.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DATA CUSTOMER
+|--------------------------------------------------------------------------
+*/
+
+$stmt = $conn->prepare("
+    SELECT
+        c.id,
+        c.user_id,
+        c.nama,
+        c.telephone,
+        c.email,
+        c.alamat,
+        c.status_langganan,
+        c.paket_id,
+        p.nama_paket,
+        p.speed_mbps
+    FROM customers c
+    LEFT JOIN paket_wifi p
+        ON p.id = c.paket_id
+    WHERE c.user_id = ?
     LIMIT 1
 ");
 
-if (!$stmtCustomer) {
-    die("Query customer gagal: " . $conn->error);
-}
+$stmt->bind_param("i", $userId);
+$stmt->execute();
 
-$stmtCustomer->bind_param("i", $userId);
-
-if (!$stmtCustomer->execute()) {
-    die("Execute query customer gagal: " . $stmtCustomer->error);
-}
-
-$resultCustomer = $stmtCustomer->get_result();
-
+$resultCustomer = $stmt->get_result();
 $customer = $resultCustomer->fetch_assoc();
 
-$stmtCustomer->close();
+$stmt->close();
 
-/* =====================================================
-   VALIDASI CUSTOMER
-===================================================== */
 
 if (!$customer) {
     die("Data customer tidak ditemukan.");
 }
 
-$customerId = (int) ($customer['id'] ?? 0);
 
-if ($customerId <= 0) {
-    die("ID customer tidak valid.");
-}
+$customerId = (int) $customer['id'];
 
-/* =====================================================
-   DATA CUSTOMER DISPLAY
-===================================================== */
+$namaCustomer = $customer['nama'] ?? 'Customer';
 
-$nama = trim(
-    (string) ($customer['nama'] ?? '')
+$avatarInitial = strtoupper(
+    mb_substr(trim($namaCustomer), 0, 1)
 );
 
-if ($nama === '') {
-    $nama = 'Customer';
-}
+$statusLangganan = normalizeSubscriptionStatus(
+    $customer['status_langganan'] ?? ''
+);
+
+$namaPaket = $customer['nama_paket'] ?? 'Belum memilih paket';
+
+$speedPaket = $customer['speed_mbps'] ?? null;
+
 
 /*
- * Ambil huruf pertama nama.
- * mb_substr digunakan agar karakter non-ASCII aman.
- */
-$initial = strtoupper(
-    mb_substr($nama, 0, 1, 'UTF-8')
-);
+|--------------------------------------------------------------------------
+| AMBIL DATA COMPLAINT
+|--------------------------------------------------------------------------
+*/
 
-/* =====================================================
-   DATA COMPLAINT
-===================================================== */
+$complaints = [];
 
-$stmtComplaint = $conn->prepare("
-    SELECT *
+$stmt = $conn->prepare("
+    SELECT
+        id,
+        customer_id,
+        judul,
+        deskripsi,
+        alamat,
+        latitude,
+        longitude,
+        status
     FROM complaint
     WHERE customer_id = ?
     ORDER BY id DESC
 ");
 
-if (!$stmtComplaint) {
-    die("Query complaint gagal: " . $conn->error);
-}
+$stmt->bind_param("i", $customerId);
+$stmt->execute();
 
-$stmtComplaint->bind_param("i", $customerId);
-
-if (!$stmtComplaint->execute()) {
-    die("Execute query complaint gagal: " . $stmtComplaint->error);
-}
-
-$resultComplaint = $stmtComplaint->get_result();
-
-/* =====================================================
-   STATUS COUNTER
-===================================================== */
-
-$totalComplaint   = 0;
-$openComplaint    = 0;
-$processComplaint = 0;
-$closedComplaint  = 0;
-
-$complaints = [];
-
-/* =====================================================
-   LOOP COMPLAINT
-===================================================== */
+$resultComplaint = $stmt->get_result();
 
 while ($row = $resultComplaint->fetch_assoc()) {
-
     $complaints[] = $row;
+}
 
-    $totalComplaint++;
+$stmt->close();
+
+
+/*
+|--------------------------------------------------------------------------
+| STATISTIK
+|--------------------------------------------------------------------------
+*/
+
+$totalComplaint = count($complaints);
+
+$openComplaint = 0;
+$processComplaint = 0;
+$closedComplaint = 0;
+
+foreach ($complaints as $item) {
 
     $status = strtolower(
-        trim(
-            (string) ($row['status'] ?? '')
-        )
+        trim((string) ($item['status'] ?? ''))
     );
 
-    /* -------------------------------------------------
-       COMPLAINT BARU
-    ------------------------------------------------- */
-
-    if (
-        in_array(
-            $status,
-            [
-                'open',
-                'baru',
-                'pending'
-            ],
-            true
-        )
-    ) {
-
+    if (in_array($status, ['open', 'baru'], true)) {
         $openComplaint++;
     }
 
-    /* -------------------------------------------------
-       SEDANG DIPROSES
-    ------------------------------------------------- */
-
-    elseif (
-        in_array(
-            $status,
-            [
-                'process',
-                'proses',
-                'on progress',
-                'in progress'
-            ],
-            true
-        )
-    ) {
-
+    if (in_array($status, ['process', 'proses', 'diproses'], true)) {
         $processComplaint++;
     }
 
-    /* -------------------------------------------------
-       SELESAI
-    ------------------------------------------------- */
-
-    elseif (
-        in_array(
-            $status,
-            [
-                'closed',
-                'selesai',
-                'resolved'
-            ],
-            true
-        )
-    ) {
-
+    if (in_array($status, ['closed', 'selesai'], true)) {
         $closedComplaint++;
     }
 }
 
-$stmtComplaint->close();
+
+/*
+|--------------------------------------------------------------------------
+| JUMLAH COMPLAINT AKTIF
+|--------------------------------------------------------------------------
+*/
+
+$activeComplaint =
+    $openComplaint +
+    $processComplaint;
+
+
+/*
+|--------------------------------------------------------------------------
+| NOTIFIKASI
+|--------------------------------------------------------------------------
+*/
+
+$notificationCount = 0;
+
+try {
+
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM notifikasi
+        WHERE user_id = ?
+        AND (
+            is_read = 0
+            OR is_read IS NULL
+        )
+    ");
+
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+
+    $notificationResult = $stmt->get_result();
+
+    $notificationData =
+        $notificationResult->fetch_assoc();
+
+    $notificationCount =
+        (int) ($notificationData['total'] ?? 0);
+
+    $stmt->close();
+
+} catch (Throwable $e) {
+
+    $notificationCount = 0;
+}
+
+
+$currentPage = 'complaint';
 
 ?>
+
 <!DOCTYPE html>
+
 <html lang="id">
+
 <head>
-    <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+```
+<meta charset="UTF-8">
 
-    <title>Complaint Saya</title>
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
-    <!-- =================================================
-         BOOTSTRAP
-    ================================================== -->
+<title>Keluhan Saya - WiFi Management</title>
 
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-    >
 
-    <!-- =================================================
-         BOOTSTRAP ICONS
-    ================================================== -->
+<link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+>
 
-    <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
-    >
 
-    <!-- =================================================
-         CUSTOMER DASHBOARD CSS
-    ================================================== -->
+<link
+    rel="stylesheet"
+    href="assets/css/dashboard.css"
+>
 
-    <link
-        rel="stylesheet"
-        href="assets/css/customer-dashboard.css"
-    >
 
-    <!-- =================================================
-         COMPLAINT CSS
-    ================================================== -->
-
-    <link
-        rel="stylesheet"
-        href="assets/css/complaint.css"
-    >
+<link
+    rel="stylesheet"
+    href="assets/css/complaint.css?v=2"
+>
+```
 
 </head>
 
 <body>
 
-<div class="dashboard-wrapper">
+<div class="customer-layout">
 
-    <!-- =================================================
-         SIDEBAR
-    ================================================== -->
+```
+<!-- ==========================================================
+     SIDEBAR
+=========================================================== -->
 
-    <aside class="sidebar">
+<aside class="sidebar" id="sidebar">
 
-        <!-- BRAND -->
 
-        <div class="sidebar-brand">
+    <div class="sidebar-brand">
 
-            <div class="brand-icon">
-                <i class="bi bi-wifi"></i>
+        <div class="brand-logo">
+            W
+        </div>
+
+        <div class="brand-text">
+
+            <strong>
+                WiFi Management
+            </strong>
+
+            <small>
+                Customer Portal
+            </small>
+
+        </div>
+
+        <button
+            type="button"
+            class="sidebar-close"
+            id="sidebarClose"
+        >
+            &times;
+        </button>
+
+    </div>
+
+
+    <div class="sidebar-scroll">
+
+
+        <div class="menu-section">
+
+            <div class="menu-label">
+                MENU UTAMA
             </div>
 
-            <div>
-                <h5>WiFi Management</h5>
 
-                <span>
-                    Customer Portal
+            <a
+                href="dashboard.php"
+                class="menu-item"
+            >
+                <span class="menu-icon">⌂</span>
+                <span class="menu-text">
+                    Dashboard
                 </span>
+            </a>
+
+
+            <?php if ($statusLangganan === 'active'): ?>
+
+                <a
+                    href="billing.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">▣</span>
+                    <span class="menu-text">
+                        Tagihan
+                    </span>
+                </a>
+
+
+                <a
+                    href="usage.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">◔</span>
+                    <span class="menu-text">
+                        Pemakaian
+                    </span>
+                </a>
+
+
+                <a
+                    href="speedtest.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">◉</span>
+                    <span class="menu-text">
+                        Speed Test
+                    </span>
+                </a>
+
+
+                <a
+                    href="complaint.php"
+                    class="menu-item active"
+                >
+                    <span class="menu-icon">⚠</span>
+
+                    <span class="menu-text">
+                        Keluhan
+                    </span>
+
+                    <?php if ($activeComplaint > 0): ?>
+
+                        <span class="menu-badge">
+                            <?= $activeComplaint ?>
+                        </span>
+
+                    <?php endif; ?>
+
+                </a>
+
+
+                <a
+                    href="chat.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">☏</span>
+                    <span class="menu-text">
+                        Chat
+                    </span>
+                </a>
+
+
+                <a
+                    href="network_status.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">⌁</span>
+                    <span class="menu-text">
+                        Status Jaringan
+                    </span>
+                </a>
+
+
+                <a
+                    href="upgrade.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">↑</span>
+                    <span class="menu-text">
+                        Upgrade Paket
+                    </span>
+                </a>
+
+
+                <a
+                    href="service_request.php"
+                    class="menu-item"
+                >
+                    <span class="menu-icon">⚙</span>
+                    <span class="menu-text">
+                        Permintaan Layanan
+                    </span>
+                </a>
+
+            <?php endif; ?>
+
+        </div>
+
+
+        <div class="menu-section">
+
+            <div class="menu-label">
+                AKUN
+            </div>
+
+
+            <a
+                href="profile.php"
+                class="menu-item"
+            >
+                <span class="menu-icon">♙</span>
+                <span class="menu-text">
+                    Profil Saya
+                </span>
+            </a>
+
+
+            <a
+                href="notifikasi.php"
+                class="menu-item"
+            >
+                <span class="menu-icon">🔔</span>
+                <span class="menu-text">
+                    Notifikasi
+                </span>
+
+                <?php if ($notificationCount > 0): ?>
+
+                    <span class="menu-badge">
+                        <?= $notificationCount ?>
+                    </span>
+
+                <?php endif; ?>
+
+            </a>
+
+
+            <a
+                href="../logout.php"
+                class="menu-item logout-item"
+            >
+                <span class="menu-icon">⇥</span>
+                <span class="menu-text">
+                    Keluar
+                </span>
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <div class="sidebar-user">
+
+        <div class="sidebar-user-avatar">
+            <?= e($avatarInitial) ?>
+        </div>
+
+        <div class="sidebar-user-info">
+
+            <strong>
+                <?= e($namaCustomer) ?>
+            </strong>
+
+            <small>
+                Customer
+            </small>
+
+        </div>
+
+    </div>
+
+</aside>
+
+
+<div
+    class="sidebar-overlay"
+    id="sidebarOverlay"
+></div>
+
+
+<!-- ==========================================================
+     MAIN CONTENT
+=========================================================== -->
+
+<main class="main-content">
+
+
+    <header class="topbar">
+
+        <div class="topbar-left">
+
+            <button
+                type="button"
+                class="mobile-menu-button"
+                id="mobileMenuButton"
+            >
+                ☰
+            </button>
+
+            <div class="breadcrumb-text">
+                Customer Portal / Keluhan
             </div>
 
         </div>
 
-        <!-- =================================================
-             SIDEBAR MENU
-        ================================================== -->
 
-        <nav class="sidebar-menu">
-
-            <a href="dashboard.php">
-
-                <i class="bi bi-grid-1x2-fill"></i>
-
-                <span>
-                    Dashboard
-                </span>
-
-            </a>
-
-            <a href="billing.php">
-
-                <i class="bi bi-receipt"></i>
-
-                <span>
-                    Tagihan
-                </span>
-
-            </a>
-
-            <a href="usage.php">
-
-                <i class="bi bi-bar-chart-fill"></i>
-
-                <span>
-                    Penggunaan
-                </span>
-
-            </a>
-
-            <a href="speedtest.php">
-
-                <i class="bi bi-speedometer2"></i>
-
-                <span>
-                    Speed Test
-                </span>
-
-            </a>
+        <div class="topbar-right">
 
             <a
-                href="complaint.php"
-                class="active"
+                href="notifikasi.php"
+                class="notification-button"
+            >
+                🔔
+
+                <?php if ($notificationCount > 0): ?>
+
+                    <span class="notification-pulse">
+                        <?= $notificationCount ?>
+                    </span>
+
+                <?php endif; ?>
+
+            </a>
+
+
+            <a
+                href="profile.php"
+                class="top-profile"
             >
 
-                <i class="bi bi-ticket-detailed-fill"></i>
-
-                <span>
-                    Complaint
-                </span>
-
-            </a>
-
-            <a href="network_status.php">
-
-                <i class="bi bi-broadcast-pin"></i>
-
-                <span>
-                    Status Jaringan
-                </span>
-
-            </a>
-
-            <a href="chat.php">
-
-                <i class="bi bi-chat-dots-fill"></i>
-
-                <span>
-                    Chat Support
-                </span>
-
-            </a>
-
-            <a href="upgrade.php">
-
-                <i class="bi bi-arrow-up-circle-fill"></i>
-
-                <span>
-                    Upgrade Paket
-                </span>
-
-            </a>
-
-            <a href="service_request.php">
-
-                <i class="bi bi-tools"></i>
-
-                <span>
-                    Permintaan Layanan
-                </span>
-
-            </a>
-
-            <a href="profile.php">
-
-                <i class="bi bi-person-fill"></i>
-
-                <span>
-                    Profile
-                </span>
-
-            </a>
-
-        </nav>
-
-        <!-- =================================================
-             SIDEBAR FOOTER
-        ================================================== -->
-
-        <div class="sidebar-footer">
-
-            <div class="sidebar-user">
-
-                <div class="sidebar-avatar">
-                    <?= e($initial) ?>
+                <div class="top-profile-avatar">
+                    <?= e($avatarInitial) ?>
                 </div>
 
-                <div>
+                <div class="top-profile-info">
 
                     <strong>
-                        <?= e($nama) ?>
+                        <?= e($namaCustomer) ?>
                     </strong>
 
                     <small>
@@ -471,455 +619,338 @@ $stmtComplaint->close();
 
                 </div>
 
-            </div>
+            </a>
 
         </div>
 
-    </aside>
+    </header>
 
-    <!-- =================================================
-         MAIN CONTENT
-    ================================================== -->
 
-    <main class="main-content">
+    <!-- ======================================================
+         PAGE
+    ======================================================= -->
 
-        <!-- =================================================
-             TOPBAR
-        ================================================== -->
+    <div class="complaint-page">
 
-        <header class="topbar">
+
+        <!-- HEADER -->
+
+        <div class="complaint-header">
 
             <div>
 
-                <h4>
-                    Complaint
-                </h4>
+                <span class="page-eyebrow">
+                    CUSTOMER SERVICE
+                </span>
+
+                <h1>
+                    Keluhan Saya
+                </h1>
 
                 <p>
-                    Kelola dan pantau laporan gangguan kamu
+                    Pantau laporan gangguan layanan WiFi Anda.
                 </p>
 
             </div>
 
-            <!-- PROFILE -->
 
-            <div class="topbar-profile">
+            <?php if ($statusLangganan === 'active'): ?>
 
-                <div class="topbar-avatar">
-                    <?= e($initial) ?>
+                <a
+                    href="complaint_create.php"
+                    class="btn-new-complaint"
+                >
+                    <span>＋</span>
+                    Buat Keluhan
+                </a>
+
+            <?php endif; ?>
+
+        </div>
+
+
+        <!-- CUSTOMER INFO -->
+
+        <div class="customer-info-card">
+
+            <div class="customer-info-icon">
+                ◉
+            </div>
+
+
+            <div class="customer-info-content">
+
+                <strong>
+                    <?= e($namaCustomer) ?>
+                </strong>
+
+                <span>
+
+                    Paket:
+                    <?= e($namaPaket) ?>
+
+                    <?php if ($speedPaket): ?>
+
+                        · <?= e($speedPaket) ?> Mbps
+
+                    <?php endif; ?>
+
+                </span>
+
+            </div>
+
+
+            <div class="customer-status">
+
+                <span class="status-dot"></span>
+
+                <?= $statusLangganan === 'active'
+                    ? 'Layanan Aktif'
+                    : e(ucfirst(
+                        str_replace(
+                            '_',
+                            ' ',
+                            $statusLangganan
+                        )
+                    ))
+                ?>
+
+            </div>
+
+        </div>
+
+
+        <!-- STATISTIK -->
+
+        <div class="complaint-stats">
+
+
+            <div class="complaint-stat-card">
+
+                <div class="stat-icon stat-icon-total">
+                    ☷
                 </div>
 
                 <div>
 
-                    <strong>
-                        <?= e($nama) ?>
-                    </strong>
+                    <span>
+                        Total Keluhan
+                    </span>
 
-                    <small>
-                        Customer
-                    </small>
+                    <strong>
+                        <?= $totalComplaint ?>
+                    </strong>
 
                 </div>
 
             </div>
 
-        </header>
 
-        <!-- =================================================
-             PAGE CONTENT
-        ================================================== -->
+            <div class="complaint-stat-card">
 
-        <div class="complaint-page">
-
-            <!-- =================================================
-                 PAGE HEADER
-            ================================================== -->
-
-            <div class="complaint-header">
+                <div class="stat-icon stat-icon-open">
+                    !
+                </div>
 
                 <div>
 
-                    <div class="page-label">
+                    <span>
+                        Keluhan Baru
+                    </span>
 
-                        <i class="bi bi-ticket-detailed-fill"></i>
+                    <strong>
+                        <?= $openComplaint ?>
+                    </strong>
 
-                        CUSTOMER SUPPORT
+                </div>
 
-                    </div>
+            </div>
 
-                    <h1>
-                        Complaint Saya
-                    </h1>
+
+            <div class="complaint-stat-card">
+
+                <div class="stat-icon stat-icon-process">
+                    ↻
+                </div>
+
+                <div>
+
+                    <span>
+                        Diproses
+                    </span>
+
+                    <strong>
+                        <?= $processComplaint ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="complaint-stat-card">
+
+                <div class="stat-icon stat-icon-closed">
+                    ✓
+                </div>
+
+                <div>
+
+                    <span>
+                        Selesai
+                    </span>
+
+                    <strong>
+                        <?= $closedComplaint ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- LIST -->
+
+        <section class="complaint-card">
+
+
+            <div class="complaint-card-header">
+
+                <div>
+
+                    <h2>
+                        Riwayat Keluhan
+                    </h2>
 
                     <p>
-                        Laporkan masalah dan pantau proses
-                        penanganan gangguan internet kamu.
+                        Daftar laporan yang telah Anda kirim.
                     </p>
 
                 </div>
 
-                <!-- CREATE BUTTON -->
 
-                <a
-                    href="complaint_create.php"
-                    class="btn-create-complaint"
-                >
+                <span class="complaint-total">
 
-                    <i class="bi bi-plus-lg"></i>
+                    <?= $totalComplaint ?>
+                    laporan
 
-                    Buat Complaint
-
-                </a>
+                </span>
 
             </div>
 
-            <!-- =================================================
-                 STATISTICS
-            ================================================== -->
 
-            <div class="complaint-stats">
+            <?php if (empty($complaints)): ?>
 
-                <!-- TOTAL -->
 
-                <div class="stat-card">
+                <div class="complaint-empty">
 
-                    <div class="stat-icon icon-total">
-
-                        <i class="bi bi-ticket-perforated-fill"></i>
-
+                    <div class="empty-icon">
+                        ✓
                     </div>
 
-                    <div>
+                    <h3>
+                        Belum Ada Keluhan
+                    </h3>
 
-                        <span>
-                            Total Complaint
-                        </span>
+                    <p>
+                        Anda belum memiliki laporan gangguan.
+                    </p>
 
-                        <strong>
-                            <?= $totalComplaint ?>
-                        </strong>
 
-                    </div>
+                    <?php if ($statusLangganan === 'active'): ?>
+
+                        <a
+                            href="complaint_create.php"
+                            class="btn-new-complaint"
+                        >
+                            Buat Keluhan
+                        </a>
+
+                    <?php endif; ?>
 
                 </div>
 
-                <!-- OPEN -->
 
-                <div class="stat-card">
+            <?php else: ?>
 
-                    <div class="stat-icon icon-open">
 
-                        <i class="bi bi-exclamation-circle-fill"></i>
+                <div class="complaint-list">
 
-                    </div>
 
-                    <div>
+                    <?php foreach ($complaints as $item): ?>
 
-                        <span>
-                            Complaint Baru
-                        </span>
 
-                        <strong>
-                            <?= $openComplaint ?>
-                        </strong>
+                        <article class="complaint-item">
 
-                    </div>
 
-                </div>
+                            <div class="complaint-item-main">
 
-                <!-- PROCESS -->
 
-                <div class="stat-card">
+                                <div class="complaint-item-top">
 
-                    <div class="stat-icon icon-process">
+                                    <span class="complaint-id">
+                                        #<?= (int) $item['id'] ?>
+                                    </span>
 
-                        <i class="bi bi-arrow-repeat"></i>
 
-                    </div>
-
-                    <div>
-
-                        <span>
-                            Sedang Diproses
-                        </span>
-
-                        <strong>
-                            <?= $processComplaint ?>
-                        </strong>
-
-                    </div>
-
-                </div>
-
-                <!-- CLOSED -->
-
-                <div class="stat-card">
-
-                    <div class="stat-icon icon-closed">
-
-                        <i class="bi bi-check-circle-fill"></i>
-
-                    </div>
-
-                    <div>
-
-                        <span>
-                            Selesai
-                        </span>
-
-                        <strong>
-                            <?= $closedComplaint ?>
-                        </strong>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-            <!-- =================================================
-                 COMPLAINT CARD
-            ================================================== -->
-
-            <div class="complaint-card">
-
-                <!-- CARD HEADER -->
-
-                <div class="card-heading">
-
-                    <div>
-
-                        <h5>
-                            Riwayat Complaint
-                        </h5>
-
-                        <p>
-                            Daftar laporan yang pernah kamu buat
-                        </p>
-
-                    </div>
-
-                    <div class="total-badge">
-
-                        <?= $totalComplaint ?>
-
-                        Complaint
-
-                    </div>
-
-                </div>
-
-                <!-- =================================================
-                     COMPLAINT LIST
-                ================================================== -->
-
-                <?php if (!empty($complaints)): ?>
-
-                    <div class="complaint-list">
-
-                        <?php foreach ($complaints as $row): ?>
-
-                            <?php
-
-                            /* =========================================
-                               ID COMPLAINT
-                            ========================================= */
-
-                            $complaintId = (int) (
-                                $row['id'] ?? 0
-                            );
-
-                            /* =========================================
-                               STATUS
-                            ========================================= */
-
-                            $status = trim(
-                                (string) (
-                                    $row['status']
-                                    ?? 'unknown'
-                                )
-                            );
-
-                            if ($status === '') {
-                                $status = 'unknown';
-                            }
-
-                            /* =========================================
-                               PRIORITY
-                            ========================================= */
-
-                            $priority = trim(
-                                (string) (
-                                    $row['prioritas']
-                                    ?? 'normal'
-                                )
-                            );
-
-                            if ($priority === '') {
-                                $priority = 'normal';
-                            }
-
-                            /* =========================================
-                               CSS CLASS
-                            ========================================= */
-
-                            $statusCss = statusClass(
-                                $status
-                            );
-
-                            $priorityCss = priorityClass(
-                                $priority
-                            );
-
-                            /* =========================================
-                               SUBJECT
-                            ========================================= */
-
-                            $subject = trim(
-                                (string) (
-                                    $row['subject']
-                                    ?? ''
-                                )
-                            );
-
-                            if ($subject === '') {
-                                $subject = 'Tanpa Subject';
-                            }
-
-                            /* =========================================
-                               CUSTOMER CODE
-                            ========================================= */
-
-                            $kodePelanggan = trim(
-                                (string) (
-                                    $row['kode_pelanggan']
-                                    ?? '-'
-                                )
-                            );
-
-                            if ($kodePelanggan === '') {
-                                $kodePelanggan = '-';
-                            }
-
-                            /* =========================================
-                               CREATED DATE
-                            ========================================= */
-
-                            $createdAt = '-';
-
-                            if (!empty($row['created_at'])) {
-
-                                $timestamp = strtotime(
-                                    $row['created_at']
-                                );
-
-                                if ($timestamp !== false) {
-
-                                    $createdAt = date(
-                                        'd M Y, H:i',
-                                        $timestamp
-                                    );
-                                }
-                            }
-
-                            ?>
-
-                            <!-- =================================================
-                                 COMPLAINT ITEM
-                            ================================================== -->
-
-                            <div class="complaint-item">
-
-                                <!-- ICON -->
-
-                                <div class="complaint-ticket-icon">
-
-                                    <i class="bi bi-ticket-detailed-fill"></i>
+                                    <span
+                                        class="complaint-status <?= e(
+                                            statusClass(
+                                                $item['status']
+                                            )
+                                        ) ?>"
+                                    >
+                                        <?= e(
+                                            statusLabel(
+                                                $item['status']
+                                            )
+                                        ) ?>
+                                    </span>
 
                                 </div>
 
-                                <!-- CONTENT -->
 
-                                <div class="complaint-main">
+                                <h3>
+                                    <?= e(
+                                        $item['judul']
+                                    ) ?>
+                                </h3>
 
-                                    <!-- TOP -->
 
-                                    <div class="complaint-top">
+                                <p class="complaint-description">
 
-                                        <span class="complaint-code">
+                                    <?= e(
+                                        $item['deskripsi']
+                                    ) ?>
 
-                                            <?= e($kodePelanggan) ?>
+                                </p>
 
-                                        </span>
 
-                                        <span class="complaint-date">
+                                <div class="complaint-meta">
 
-                                            <i class="bi bi-clock"></i>
 
-                                            <?= e($createdAt) ?>
+                                    <?php if (!empty($item['alamat'])): ?>
 
-                                        </span>
-
-                                    </div>
-
-                                    <!-- SUBJECT -->
-
-                                    <h6>
-                                        <?= e($subject) ?>
-                                    </h6>
-
-                                    <!-- META -->
-
-                                    <div class="complaint-meta">
-
-                                        <!-- PRIORITY -->
-
-                                        <span
-                                            class="complaint-badge <?= e($priorityCss) ?>"
-                                        >
-
-                                            <i class="bi bi-flag-fill"></i>
-
+                                        <span>
+                                            📍
                                             <?= e(
-                                                strtoupper($priority)
+                                                $item['alamat']
                                             ) ?>
-
                                         </span>
 
-                                        <!-- STATUS -->
+                                    <?php endif; ?>
 
-                                        <span
-                                            class="complaint-badge <?= e($statusCss) ?>"
-                                        >
 
-                                            <i class="bi bi-circle-fill"></i>
+                                    <?php if (
+                                        $item['latitude'] !== null &&
+                                        $item['longitude'] !== null
+                                    ): ?>
 
-                                            <?= e(
-                                                strtoupper($status)
-                                            ) ?>
-
+                                        <span>
+                                            • Lokasi tersedia
                                         </span>
-
-                                    </div>
-
-                                </div>
-
-                                <!-- ACTION -->
-
-                                <div class="complaint-action">
-
-                                    <?php if ($complaintId > 0): ?>
-
-                                        <a
-                                            href="complaint_detail.php?id=<?= $complaintId ?>"
-                                            class="btn-detail"
-                                            title="Detail complaint"
-                                            aria-label="Detail complaint"
-                                        >
-
-                                            <i class="bi bi-chevron-right"></i>
-
-                                        </a>
 
                                     <?php endif; ?>
 
@@ -927,64 +958,172 @@ $stmtComplaint->close();
 
                             </div>
 
-                        <?php endforeach; ?>
 
-                    </div>
+                            <div class="complaint-item-action">
 
-                <?php else: ?>
+                                <a
+                                    href="complaint_detail.php?id=<?= (int) $item['id'] ?>"
+                                    class="btn-detail"
+                                >
+                                    Detail
+                                    <span>→</span>
+                                </a>
 
-                    <!-- =================================================
-                         EMPTY STATE
-                    ================================================== -->
+                            </div>
 
-                    <div class="empty-state">
+                        </article>
 
-                        <div class="empty-icon">
 
-                            <i class="bi bi-ticket-detailed"></i>
+                    <?php endforeach; ?>
 
-                        </div>
+                </div>
 
-                        <h4>
-                            Belum Ada Complaint
-                        </h4>
+            <?php endif; ?>
 
-                        <p>
-                            Kamu belum memiliki laporan complaint.
-                            Jika mengalami masalah internet, kamu bisa
-                            membuat laporan baru.
-                        </p>
 
-                        <a
-                            href="complaint_create.php"
-                            class="btn-create-complaint"
-                        >
+        </section>
 
-                            <i class="bi bi-plus-lg"></i>
 
-                            Buat Complaint
+        <!-- HELP -->
 
-                        </a>
+        <div class="complaint-help">
 
-                    </div>
+            <div class="help-icon">
+                ?
+            </div>
 
-                <?php endif; ?>
+
+            <div class="help-content">
+
+                <strong>
+                    Butuh bantuan lebih lanjut?
+                </strong>
+
+                <p>
+                    Hubungi customer service melalui fitur chat
+                    jika membutuhkan bantuan tambahan.
+                </p>
 
             </div>
 
+
+            <a
+                href="chat.php"
+                class="help-button"
+            >
+                Hubungi CS
+            </a>
+
         </div>
 
-    </main>
+
+    </div>
+
+
+    <!-- FOOTER -->
+
+    <footer class="customer-footer">
+
+        <span>
+            © <?= date('Y') ?> WiFi Management
+        </span>
+
+        <span>
+            Customer Portal
+        </span>
+
+    </footer>
+
+
+</main>
+```
 
 </div>
 
-<!-- =================================================
-     BOOTSTRAP JS
-================================================== -->
+<script>
 
-<script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-></script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const sidebar =
+        document.getElementById('sidebar');
+
+    const overlay =
+        document.getElementById('sidebarOverlay');
+
+    const menuButton =
+        document.getElementById('mobileMenuButton');
+
+    const closeButton =
+        document.getElementById('sidebarClose');
+
+
+    function openSidebar() {
+
+        if (sidebar) {
+            sidebar.classList.add('show');
+        }
+
+        if (overlay) {
+            overlay.classList.add('show');
+        }
+
+        document.body.classList.add('sidebar-open');
+    }
+
+
+    function closeSidebar() {
+
+        if (sidebar) {
+            sidebar.classList.remove('show');
+        }
+
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+
+        document.body.classList.remove('sidebar-open');
+    }
+
+
+    if (menuButton) {
+        menuButton.addEventListener(
+            'click',
+            openSidebar
+        );
+    }
+
+
+    if (closeButton) {
+        closeButton.addEventListener(
+            'click',
+            closeSidebar
+        );
+    }
+
+
+    if (overlay) {
+        overlay.addEventListener(
+            'click',
+            closeSidebar
+        );
+    }
+
+
+    window.addEventListener(
+        'resize',
+        function () {
+
+            if (window.innerWidth > 991) {
+                closeSidebar();
+            }
+
+        }
+    );
+
+});
+
+</script>
 
 </body>
+
 </html>
