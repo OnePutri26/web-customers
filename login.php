@@ -797,308 +797,308 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <link
         rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
-    >
-
-
-    <!-- Custom CSS -->
-
-    <link
-        rel="stylesheet"
-        href="assets/css/login.css?v=10"
-    >
-
-</head>
-
-
-<body>
-
-
-<!-- ==========================================================
-     BACKGROUND
-========================================================== -->
-
-<div class="background-circle circle-1"></div>
-
-<div class="background-circle circle-2"></div>
-
-
-
-<!-- ==========================================================
-     LOGIN WRAPPER
-========================================================== -->
-
-<div class="login-wrapper">
-
-
-    <div class="login-container">
-
-
-        <!-- ==================================================
-             LEFT
-        =================================================== -->
-
-        <div class="login-info">
-
-
-            <div class="wifi-icon">
-
-                <img
-                    src="logo-yesnet.png"
-                    alt="Logo WiFi"
-                >
-
-            </div>
-
-
-            <h1>
-
-                WiFi<br>
-
-                <span>
-                    Management
-                </span>
-
-            </h1>
-
-
-            <p>
-
-                Kelola layanan WiFi dengan lebih mudah,
-                cepat, dan terorganisir dalam satu sistem.
-
-            </p>
-
-
-            <div class="feature-list">
-
-
-                <div class="feature-item">
-
-                    <div class="feature-icon">
-                        ✓
-                    </div>
-
-                    <span>
-                        Kelola data pelanggan
-                    </span>
-
-                </div>
-
-
-                <div class="feature-item">
-
-                    <div class="feature-icon">
-                        ✓
-                    </div>
-
-                    <span>
-                        Pantau instalasi WiFi
-                    </span>
-
-                </div>
-
-
-                <div class="feature-item">
-
-                    <div class="feature-icon">
-                        ✓
-                    </div>
-
-                    <span>
-                        Sistem terintegrasi
-                    </span>
-
-                </div>
-
-
-            </div>
-
-
-        </div>
-
-
-
-        <!-- ==================================================
-             RIGHT
-        =================================================== -->
-
-        <div class="login-card">
-
-
-            <div class="login-header">
-
-                <h2>
-                    Selamat Datang 👋
-                </h2>
-
-                <p>
-                    Masuk menggunakan username atau nama Anda.
-                </p>
-
-            </div>
-
-
-
-            <!-- ERROR -->
-
-            <?php if ($error !== ''): ?>
-
-                <div
-                    class="alert alert-danger mb-4"
-                    role="alert"
-                >
-
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-
-                    <?= e($error) ?>
-
-                </div>
-
-            <?php endif; ?>
-
-
-
-            <!-- LOGIN FORM -->
-
-            <form
-                method="POST"
-                action=""
-                autocomplete="on"
-            >
-
-
-                <!-- USERNAME / NAMA -->
-
-                <div class="mb-3">
-
-                    <label
-                        for="username"
-                        class="form-label"
-                    >
-
-                        Username / Nama
-
-                    </label>
-
-
-                    <div class="input-wrapper">
-
-                        <span class="input-icon">
-
-                            <i class="bi bi-person"></i>
-
-                        </span>
-
-
-                        <input
-                            type="text"
-                            id="username"
-                            name="username"
-                            class="form-control"
-                            placeholder="Masukkan username atau nama"
-                            value="<?= e($usernameInput) ?>"
-                            autocomplete="username"
-                            required
-                            autofocus
-                        >
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- PASSWORD -->
-
-                <div class="mb-4">
-
-                    <label
-                        for="password"
-                        class="form-label"
-                    >
-
-                        Password
-
-                    </label>
-
-
-                    <div class="input-wrapper">
-
-                        <span class="input-icon">
-
-                            <i class="bi bi-lock"></i>
-
-                        </span>
-
-
-                        <input
-                            type="password"
-                            id="password"
-                            name="password"
-                            class="form-control"
-                            placeholder="Masukkan password"
-                            autocomplete="current-password"
-                            required
-                        >
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- LOGIN -->
-
-                <button
-                    type="submit"
-                    class="btn login-btn w-100"
-                >
-
-                    <i class="bi bi-box-arrow-in-right me-2"></i>
-
-                    Masuk ke Dashboard
-
-                </button>
-
-
-            </form>
-
-
-
-            <!-- REGISTER -->
-
-            <div class="register-text">
-
-                Belum punya akun?
-
-                <a href="register.php">
-                    Daftar sekarang
-                </a>
-
-            </div>
-
-
-
-            <!-- SECURITY -->
-
-            <div class="security-text">
-
-                <i class="bi bi-shield-lock-fill"></i>
-
-                Sistem login aman &amp; terproteksi
-
-            </div>
-
-
-        </div>
-
-
-    </div>
-
-</div>
-
-
-</body>
-
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" 
+    > 
+ 
+ 
+    <!-- Custom CSS --> 
+ 
+    <link 
+        rel="stylesheet" 
+        href="assets/css/login.css?v=10" 
+    > 
+ 
+</head> 
+ 
+ 
+<body> 
+ 
+ 
+<!-- ========================================================== 
+     BACKGROUND 
+========================================================== --> 
+ 
+<div class="background-circle circle-1"></div> 
+ 
+<div class="background-circle circle-2"></div> 
+ 
+ 
+ 
+<!-- ========================================================== 
+     LOGIN WRAPPER 
+========================================================== --> 
+ 
+<div class="login-wrapper"> 
+ 
+ 
+    <div class="login-container"> 
+ 
+ 
+        <!-- ================================================== 
+             LEFT 
+        =================================================== --> 
+ 
+        <div class="login-info"> 
+ 
+ 
+            <div class="wifi-icon"> 
+ 
+                <img 
+                    src="logo-yesnet.png" 
+                    alt="Logo WiFi" 
+                > 
+ 
+            </div> 
+ 
+ 
+            <h1> 
+ 
+                WiFi<br> 
+ 
+                <span> 
+                    Management 
+                </span> 
+ 
+            </h1> 
+ 
+ 
+            <p> 
+ 
+                Kelola layanan WiFi dengan lebih mudah, 
+                cepat, dan terorganisir dalam satu sistem. 
+ 
+            </p> 
+ 
+ 
+            <div class="feature-list"> 
+ 
+ 
+                <div class="feature-item"> 
+ 
+                    <div class="feature-icon"> 
+                        ✓ 
+                    </div> 
+ 
+                    <span> 
+                        Kelola data pelanggan 
+                    </span> 
+ 
+                </div> 
+ 
+ 
+                <div class="feature-item"> 
+ 
+                    <div class="feature-icon"> 
+                        ✓ 
+                    </div> 
+ 
+                    <span> 
+                        Pantau instalasi WiFi 
+                    </span> 
+ 
+                </div> 
+ 
+ 
+                <div class="feature-item"> 
+ 
+                    <div class="feature-icon"> 
+                        ✓ 
+                    </div> 
+ 
+                    <span> 
+                        Sistem terintegrasi 
+                    </span> 
+ 
+                </div> 
+ 
+ 
+            </div> 
+ 
+ 
+        </div> 
+ 
+ 
+ 
+        <!-- ================================================== 
+             RIGHT 
+        =================================================== --> 
+ 
+        <div class="login-card"> 
+ 
+ 
+            <div class="login-header"> 
+ 
+                <h2> 
+                    Selamat Datang 👋 
+                </h2> 
+ 
+                <p> 
+                    Masuk menggunakan username atau nama Anda. 
+                </p> 
+ 
+            </div> 
+ 
+ 
+ 
+            <!-- ERROR --> 
+ 
+            <?php if ($error !== ''): ?> 
+ 
+                <div 
+                    class="alert alert-danger mb-4" 
+                    role="alert" 
+                > 
+ 
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+ 
+                    <?= e($error) ?> 
+ 
+                </div> 
+ 
+            <?php endif; ?> 
+ 
+ 
+ 
+            <!-- LOGIN FORM --> 
+ 
+            <form 
+                method="POST" 
+                action="" 
+                autocomplete="on" 
+            > 
+ 
+ 
+                <!-- USERNAME / NAMA --> 
+ 
+                <div class="mb-3"> 
+ 
+                    <label 
+                        for="username" 
+                        class="form-label" 
+                    > 
+ 
+                        Username / Nama 
+ 
+                    </label> 
+ 
+ 
+                    <div class="input-wrapper"> 
+ 
+                        <span class="input-icon"> 
+ 
+                            <i class="bi bi-person"></i> 
+ 
+                        </span> 
+ 
+ 
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            class="form-control" 
+                            placeholder="Masukkan username atau nama" 
+                            value="<?= e($usernameInput) ?>" 
+                            autocomplete="username" 
+                            required 
+                            autofocus 
+                        > 
+ 
+                    </div> 
+ 
+                </div> 
+ 
+ 
+ 
+                <!-- PASSWORD --> 
+ 
+                <div class="mb-4"> 
+ 
+                    <label 
+                        for="password" 
+                        class="form-label" 
+                    > 
+ 
+                        Password 
+ 
+                    </label> 
+ 
+ 
+                    <div class="input-wrapper"> 
+ 
+                        <span class="input-icon"> 
+ 
+                            <i class="bi bi-lock"></i> 
+ 
+                        </span> 
+ 
+ 
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-control" 
+                            placeholder="Masukkan password" 
+                            autocomplete="current-password" 
+                            required 
+                        > 
+ 
+                    </div> 
+ 
+                </div> 
+ 
+ 
+ 
+                <!-- LOGIN --> 
+ 
+                <button 
+                    type="submit" 
+                    class="btn login-btn w-100" 
+                > 
+ 
+                    <i class="bi bi-box-arrow-in-right me-2"></i> 
+ 
+                    Masuk ke Dashboard 
+ 
+                </button> 
+ 
+ 
+            </form> 
+ 
+ 
+ 
+            <!-- REGISTER --> 
+ 
+            <div class="register-text"> 
+ 
+                Belum punya akun? 
+ 
+                <a href="register.php"> 
+                    Daftar sekarang 
+                </a> 
+ 
+            </div> 
+ 
+ 
+ 
+            <!-- SECURITY --> 
+ 
+            <div class="security-text"> 
+ 
+                <i class="bi bi-shield-lock-fill"></i> 
+ 
+                Sistem login aman &amp; terproteksi 
+ 
+            </div> 
+ 
+ 
+        </div> 
+ 
+ 
+    </div> 
+ 
+</div> 
+ 
+ 
+</body> 
+ 
 </html>
