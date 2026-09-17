@@ -321,6 +321,24 @@ a {
     font-size: 11px;
 }
 
+.speedtest-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.speedtest-link:hover {
+    background: #1d4ed8;
+    color: #fff;
+}
+
 .topbar-right {
     display: flex;
     align-items: center;

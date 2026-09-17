@@ -1580,6 +1580,18 @@ $currentPage =
             <div class="topbar-right">
 
                 <a
+                    href="chat.php"
+                    class="cs-button"
+                    title="Chat CS"
+                    aria-label="Chat CS"
+                >
+
+                    <i class="bi bi-headset"></i>
+
+                </a>
+
+
+                <a
                     href="notifikasi.php"
                     class="notification-button"
                     title="Notifikasi"

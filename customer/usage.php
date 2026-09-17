@@ -1,5 +1,8 @@
 <?php
 
+header("Location: network.php");
+exit;
+
 session_start();
 
 require_once "../config/database.php";
@@ -602,13 +605,8 @@ if ($avatarInitial === '') {
         </a>
 
         <a href="usage.php" class="menu-item active">
-            <i class="bi bi-bar-chart-fill"></i>
-            <span>Pemakaian</span>
-        </a>
-
-        <a href="speedtest.php" class="menu-item">
             <i class="bi bi-speedometer2"></i>
-            <span>Speed Test</span>
+            <span>Pemakaian &amp; Speed Test</span>
         </a>
 
         <a href="complaint.php" class="menu-item">
@@ -673,7 +671,7 @@ if ($avatarInitial === '') {
     <div>
 
         <h4>
-            Pemakaian Internet
+            Pemakaian &amp; Speed Test
         </h4>
 
         <span>
@@ -681,6 +679,15 @@ if ($avatarInitial === '') {
         </span>
 
     </div>
+
+
+    <a
+        href="speedtest.php"
+        class="speedtest-link"
+    >
+        <i class="bi bi-lightning-charge-fill"></i>
+        <span>Mulai Speed Test</span>
+    </a>
 
 
     <div class="topbar-right">

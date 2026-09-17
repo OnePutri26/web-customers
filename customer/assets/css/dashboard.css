@@ -726,6 +726,51 @@ button {
 }
 
 
+.cs-button {
+
+    width: 38px;
+    height: 38px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border:
+        1px solid #e6ebf2;
+
+    border-radius: 11px;
+
+    background: #fff;
+
+    color: #64748b;
+
+    box-shadow: var(--shadow-sm);
+
+    transition: .2s;
+
+}
+
+
+.cs-button:hover {
+
+    color: var(--primary);
+
+    border-color: #cfe0ff;
+
+    background: #f7faff;
+
+    transform:
+        translateY(-1px);
+
+}
+
+
+.cs-button i {
+    font-size: 15px;
+}
+
+
 .notification-button {
 
     width: 38px;
@@ -3789,6 +3834,13 @@ button {
     }
 
     .notification-button {
+
+        width: 35px;
+        height: 35px;
+
+    }
+
+    .cs-button {
 
         width: 35px;
         height: 35px;
