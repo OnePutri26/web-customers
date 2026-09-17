@@ -153,7 +153,7 @@ $initial = strtoupper(
 $stmtComplaint = $conn->prepare("
     SELECT *
     FROM complaint
-    WHERE id_customer = ?
+    WHERE customer_id = ?
     ORDER BY id DESC
 ");
 
@@ -294,7 +294,7 @@ $stmtComplaint->close();
 
     <link
         rel="stylesheet"
-        href="../assets/css/customer-dashboard.css"
+        href="assets/css/customer-dashboard.css"
     >
 
     <!-- =================================================
@@ -303,7 +303,7 @@ $stmtComplaint->close();
 
     <link
         rel="stylesheet"
-        href="../assets/css/complaint.css"
+        href="assets/css/complaint.css"
     >
 
 </head>

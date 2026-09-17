@@ -1101,7 +1101,7 @@ $currentPage =
 </head>
 
 
-<body>
+<body class="dashboard-page">
 
 <div class="customer-layout">
 

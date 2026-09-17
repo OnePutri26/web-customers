@@ -334,6 +334,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="assets/css/theme.css">
+
     <link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
@@ -342,7 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 
-<body class="bg-light">
+<body>
 
 
 <div class="container py-5">

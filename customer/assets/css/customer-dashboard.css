@@ -1,4 +1,4 @@
-@import url('theme.css');
+@import url('dashboard.css');
 
 /* =====================================================
    GLOBAL
@@ -516,6 +516,52 @@ body {
     font-size: 11px;
 
     margin-bottom: 18px;
+}
+
+/* Keep legacy page shells aligned with the canonical dashboard shell. */
+.sidebar-logo {
+    min-height: 58px;
+    padding: 0 7px 18px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.logo-icon {
+    background: linear-gradient(135deg, #1555d9, #4b8df7);
+    box-shadow: 0 8px 22px rgba(37, 99, 235, .25);
+}
+
+.sidebar {
+    padding: 17px 13px;
+}
+
+.main-content {
+    margin-left: 250px;
+}
+
+.topbar {
+    min-height: 76px;
+    padding: 0 32px;
+    background: rgba(255, 255, 255, .9);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.content {
+    padding: 28px 32px 50px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+    }
+
+    .topbar {
+        padding: 0 16px;
+    }
+
+    .content {
+        padding: 20px 16px 36px;
+    }
 }
 
 .btn-pay {

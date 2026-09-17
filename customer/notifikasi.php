@@ -263,7 +263,7 @@ function formatNotificationDate($date)
     <!-- CSS Notifikasi -->
     <link
         rel="stylesheet"
-        href="notifikasi.css"
+        href="assets/css/notifikasi.css"
     >
 
 </head>
