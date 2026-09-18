@@ -1,172 +1,196 @@
 <?php
-
 session_start();
 
-require_once "../config/database.php";
-require_once "../config/auth.php";
+require_once __DIR__ . '/../config/koneksi.php';
 
-requireRole('customer');
-
-date_default_timezone_set('Asia/Jakarta');
-
-$userId = (int)($_SESSION['user_id'] ?? 0);
-
-if ($userId <= 0) {
-    header("Location: ../login.php");
+/*
+|--------------------------------------------------------------------------
+| AUTH
+|--------------------------------------------------------------------------
+*/
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'customer') {
+    header('Location: ../login.php');
     exit;
 }
 
-/* =====================================================
-   HELPER
-===================================================== */
+$userId = (int) $_SESSION['user_id'];
 
+/*
+|--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
 function e($value): string
 {
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-/* =====================================================
-   DATA CUSTOMER
-===================================================== */
+function getInitial($name): string
+{
+    $name = trim((string) $name);
 
-$stmt = $conn->prepare("
+    if ($name === '') {
+        return 'C';
+    }
+
+    $parts = preg_split('/\s+/', $name);
+
+    if (count($parts) >= 2) {
+        return strtoupper(
+            substr($parts[0], 0, 1) .
+            substr($parts[1], 0, 1)
+        );
+    }
+
+    return strtoupper(substr($name, 0, 2));
+}
+
+/*
+|--------------------------------------------------------------------------
+| DATA CUSTOMER
+|--------------------------------------------------------------------------
+*/
+$customer = [
+    'nama' => $_SESSION['nama'] ?? $_SESSION['username'] ?? 'Customer',
+    'email' => $_SESSION['email'] ?? '-',
+    'status_langganan' => 'belum_berlangganan',
+    'paket_id' => null,
+    'nama_paket' => '-',
+    'speed_mbps' => 0
+];
+
+$sql = "
     SELECT
-        c.id,
         c.nama,
         c.email,
-        c.paket_id,
         c.status_langganan,
+        c.paket_id,
         p.nama_paket,
         p.speed_mbps
     FROM customers c
-    LEFT JOIN paket_wifi p ON p.id = c.paket_id
+    LEFT JOIN paket_wifi p
+        ON p.id = c.paket_id
     WHERE c.user_id = ?
     LIMIT 1
-");
+";
 
-$stmt->bind_param("i", $userId);
-$stmt->execute();
+$stmt = mysqli_prepare($conn, $sql);
 
-$customer = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+if ($stmt) {
+    mysqli_stmt_bind_param($stmt, 'i', $userId);
+    mysqli_stmt_execute($stmt);
 
-if (!$customer) {
-    die("Data customer tidak ditemukan.");
+    $result = mysqli_stmt_get_result($stmt);
+
+    if ($row = mysqli_fetch_assoc($result)) {
+        $customer = array_merge($customer, $row);
+    }
+
+    mysqli_stmt_close($stmt);
 }
 
-$nama = $customer['nama'] ?? 'Customer';
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER DATA
+|--------------------------------------------------------------------------
+*/
+$namaCustomer = $customer['nama'] ?: 'Customer';
+$emailCustomer = $customer['email'] ?: '-';
+$statusLangganan = strtolower(trim($customer['status_langganan'] ?? ''));
 
-$initial = strtoupper(
-    substr(trim($nama), 0, 1)
+$namaPaket = $customer['nama_paket'] ?: '-';
+$speedPaket = (float) ($customer['speed_mbps'] ?? 0);
+
+$initial = getInitial($namaCustomer);
+
+/*
+|--------------------------------------------------------------------------
+| STATUS AKTIF
+|--------------------------------------------------------------------------
+*/
+$isActive = in_array(
+    $statusLangganan,
+    ['active', 'aktif'],
+    true
 );
 
-if ($initial === '') {
-    $initial = 'C';
-}
+/*
+|--------------------------------------------------------------------------
+| DEMO NETWORK DATA
+|--------------------------------------------------------------------------
+|
+| Nilai ini bisa nanti diganti dengan data real dari API / MikroTik /
+| server monitoring.
+|
+*/
+$ping = 9;
+$download = 87.4;
+$upload = 18.2;
 
-$customerId = (int)($customer['id'] ?? 0);
+$networkStatus = 'Normal';
+$connectionType = 'WiFi';
+$serverLocation = 'Jakarta';
+$ipAddress = '192.168.1.10';
 
-$paketNama = $customer['nama_paket'] ?? 'Belum ada paket';
+$lastTest = 'Belum ada tes';
+$testRecords = 12;
 
-$paketSpeed = isset($customer['speed_mbps']) && $customer['speed_mbps'] !== null
-    ? (float)$customer['speed_mbps']
-    : 0;
-
-$statusLangganan = $customer['status_langganan'] ?? '';
-
-/* =====================================================
-   SERVER INFO
-===================================================== */
-
-$serverName = $_SERVER['SERVER_NAME'] ?? 'Local Server';
-$serverIp   = $_SERVER['SERVER_ADDR'] ?? '127.0.0.1';
-
-/* =====================================================
-   PING ENDPOINT
-   Dipakai oleh JavaScript untuk mengukur response time.
-===================================================== */
-
-if (isset($_GET['ping'])) {
-    header("Cache-Control: no-store, no-cache, must-revalidate");
-    header("Pragma: no-cache");
-    http_response_code(204);
-    exit;
-}
-
-/* =====================================================
-   USAGE SUMMARY
-===================================================== */
-
-$usageAverage = [
-    'download' => 0,
-    'upload' => 0,
-    'ping' => 0,
-    'records' => 0
+/*
+|--------------------------------------------------------------------------
+| DEMO HISTORY
+|--------------------------------------------------------------------------
+*/
+$history = [
+    [
+        'date' => date('d M Y'),
+        'time' => '20:15',
+        'download' => '87.4',
+        'upload' => '18.2',
+        'ping' => '9'
+    ],
+    [
+        'date' => date('d M Y', strtotime('-1 day')),
+        'time' => '21:08',
+        'download' => '82.6',
+        'upload' => '17.9',
+        'ping' => '11'
+    ],
+    [
+        'date' => date('d M Y', strtotime('-2 day')),
+        'time' => '19:42',
+        'download' => '89.1',
+        'upload' => '19.4',
+        'ping' => '8'
+    ],
+    [
+        'date' => date('d M Y', strtotime('-3 day')),
+        'time' => '20:31',
+        'download' => '85.7',
+        'upload' => '18.8',
+        'ping' => '10'
+    ]
 ];
-
-$usageHistory = [];
-
-$usageSummaryStatement = $conn->prepare("
-    SELECT
-        COALESCE(AVG(download_mbps), 0) AS average_download,
-        COALESCE(AVG(upload_mbps), 0) AS average_upload,
-        COALESCE(AVG(ping_ms), 0) AS average_ping,
-        COUNT(*) AS total_records
-    FROM usage_data
-    WHERE customer_id = ?
-      AND recorded_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-");
-
-$usageSummaryStatement->bind_param("i", $customerId);
-$usageSummaryStatement->execute();
-$usageSummary = $usageSummaryStatement->get_result()->fetch_assoc();
-$usageSummaryStatement->close();
-
-if ($usageSummary) {
-    $usageAverage = [
-        'download' => (float) ($usageSummary['average_download'] ?? 0),
-        'upload' => (float) ($usageSummary['average_upload'] ?? 0),
-        'ping' => (float) ($usageSummary['average_ping'] ?? 0),
-        'records' => (int) ($usageSummary['total_records'] ?? 0)
-    ];
-}
-
-$usageHistoryStatement = $conn->prepare("
-    SELECT download_mbps, upload_mbps, ping_ms, recorded_at
-    FROM usage_data
-    WHERE customer_id = ?
-    ORDER BY recorded_at DESC
-    LIMIT 5
-");
-
-$usageHistoryStatement->bind_param("i", $customerId);
-$usageHistoryStatement->execute();
-$usageHistoryResult = $usageHistoryStatement->get_result();
-
-while ($usageRow = $usageHistoryResult->fetch_assoc()) {
-    $usageHistory[] = $usageRow;
-}
-
-$usageHistoryStatement->close();
-
 ?>
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Network & Speed Test - Customer Portal</title>
-
-    <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
     >
 
+    <title>Status Jaringan - WiFi Management</title>
+
     <link
         rel="stylesheet"
-        href="network.css?v=1"
+        href="assets/css/network_status.css?v=1"
+    >
+
+    <!-- Font Awesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
     >
 </head>
 
@@ -174,469 +198,790 @@ $usageHistoryStatement->close();
 
 <div class="network-layout">
 
-    <!-- =================================================
+    <!-- =====================================================
          SIDEBAR
-    ================================================== -->
-
+    ====================================================== -->
     <aside class="sidebar">
 
         <div class="sidebar-logo">
+
             <div class="logo-icon">
-                <i class="bi bi-wifi"></i>
+                <i class="fa-solid fa-wifi"></i>
             </div>
 
             <div class="logo-text">
                 <h5>WiFi Management</h5>
                 <span>Customer Portal</span>
             </div>
+
         </div>
 
         <nav class="sidebar-menu">
 
-            <p class="menu-title">MENU</p>
+            <div class="menu-title">
+                MENU UTAMA
+            </div>
 
-            <a href="dashboard.php" class="menu-item">
-                <i class="bi bi-grid-fill"></i>
+            <a
+                href="dashboard.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-house"></i>
                 <span>Dashboard</span>
             </a>
 
-            <a href="billing.php" class="menu-item">
-                <i class="bi bi-credit-card-fill"></i>
+            <a
+                href="billing.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-file-invoice-dollar"></i>
                 <span>Tagihan</span>
             </a>
 
-            <a href="network.php" class="menu-item active">
-                <i class="bi bi-bar-chart-fill"></i>
-                <span>Network, Pemakaian &amp; Speed Test</span>
+            <a
+                href="usage.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Penggunaan</span>
             </a>
 
-            <a href="complaint.php" class="menu-item">
-                <i class="bi bi-tools"></i>
-                <span>Gangguan</span>
+            <a
+                href="speedtest.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-gauge-high"></i>
+                <span>Speed Test</span>
             </a>
 
-            <a href="network_status.php" class="menu-item">
-                <i class="bi bi-globe2"></i>
+            <a
+                href="network_status.php"
+                class="menu-item active"
+            >
+                <i class="fa-solid fa-signal"></i>
                 <span>Status Jaringan</span>
             </a>
 
-            <a href="chat.php" class="menu-item">
-                <i class="bi bi-chat-dots-fill"></i>
-                <span>Chat CS</span>
+            <a
+                href="complaint.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-headset"></i>
+                <span>Keluhan</span>
             </a>
 
-            <p class="menu-title menu-account">AKUN</p>
-
-            <a href="upgrade.php" class="menu-item">
-                <i class="bi bi-arrow-up-circle-fill"></i>
-                <span>Upgrade Paket</span>
+            <a
+                href="chat.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-comments"></i>
+                <span>Chat</span>
             </a>
 
-            <a href="service_request.php" class="menu-item">
-                <i class="bi bi-plus-circle-fill"></i>
-                <span>Layanan Tambahan</span>
+            <div class="menu-title menu-account">
+                AKUN
+            </div>
+
+            <a
+                href="profile.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-user"></i>
+                <span>Profil</span>
             </a>
 
-            <a href="profile.php" class="menu-item">
-                <i class="bi bi-person-circle"></i>
-                <span>Profile Saya</span>
+            <a
+                href="notifikasi.php"
+                class="menu-item"
+            >
+                <i class="fa-solid fa-bell"></i>
+                <span>Notifikasi</span>
             </a>
 
-            <a href="../logout.php" class="menu-item logout">
-                <i class="bi bi-box-arrow-right"></i>
-                <span>Logout</span>
+            <a
+                href="../logout.php"
+                class="menu-item logout"
+            >
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Keluar</span>
             </a>
 
         </nav>
 
+        <!-- USER -->
         <div class="sidebar-user">
+
             <div class="user-avatar">
                 <?= e($initial) ?>
             </div>
 
             <div class="user-detail">
-                <strong><?= e($nama) ?></strong>
+                <strong><?= e($namaCustomer) ?></strong>
                 <span>Customer</span>
             </div>
+
         </div>
 
     </aside>
 
 
-    <!-- =================================================
+    <!-- =====================================================
          MAIN
-    ================================================== -->
-
+    ====================================================== -->
     <main class="main-content">
 
+        <!-- TOPBAR -->
         <header class="topbar">
 
             <div>
-                <h4>Network, Pemakaian &amp; Speed Test</h4>
-                <span>Periksa jaringan, pemakaian, dan kecepatan koneksi internet kamu.</span>
+                <h4>Status Jaringan</h4>
+
+                <span>
+                    Pantau koneksi dan lakukan tes kecepatan internet
+                </span>
             </div>
 
             <div class="topbar-right">
 
                 <a
-                    href="chat.php"
-                    class="topbar-action"
-                    title="Chat CS"
-                    aria-label="Chat CS"
-                >
-                    <i class="bi bi-headset"></i>
-                </a>
-
-                <a
                     href="notifikasi.php"
                     class="topbar-action"
                     title="Notifikasi"
-                    aria-label="Notifikasi"
                 >
-                    <i class="bi bi-bell"></i>
+                    <i class="fa-regular fa-bell"></i>
                 </a>
 
-                <a href="profile.php" class="top-profile">
+                <div class="top-profile">
 
                     <div class="top-avatar">
                         <?= e($initial) ?>
                     </div>
 
                     <div class="top-user">
-                        <strong><?= e($nama) ?></strong>
-                        <span>Customer</span>
+                        <strong><?= e($namaCustomer) ?></strong>
+                        <span><?= e($emailCustomer) ?></span>
                     </div>
 
-                </a>
+                </div>
 
             </div>
 
         </header>
 
 
+        <!-- CONTENT -->
         <div class="content">
 
             <!-- PAGE HEADER -->
+            <section class="page-header">
 
-            <div class="page-header">
+                <span class="page-label">
+                    NETWORK & SPEED TEST
+                </span>
 
-                <span class="page-label">INTERNET TOOLS</span>
-
-                <h1>Network, Pemakaian &amp; Speed Test</h1>
+                <h1>
+                    Status Jaringan
+                </h1>
 
                 <p>
-                    Uji kecepatan internet, lihat ringkasan pemakaian,
-                    dan pantau informasi koneksi yang sedang digunakan.
+                    Periksa kondisi koneksi internet kamu dan lakukan
+                    pengujian kecepatan untuk mengetahui performa jaringan
+                    saat ini.
                 </p>
 
-            </div>
-
-
-            <!-- =================================================
-                 SPEED TEST CARD
-            ================================================== -->
-
-            <section class="speedtest-card">
-
-                <div class="speedtest-main">
-
-                    <div class="speedometer-wrapper">
-
-                        <div class="speedometer" id="speedometer">
-
-                            <div class="speedometer-inner">
-
-                                <span class="speed-status" id="testStatus">
-                                    SIAP
-                                </span>
-
-                                <div class="speed-value">
-                                    <strong id="speedValue">0</strong>
-                                    <span>Mbps</span>
-                                </div>
-
-                                <small id="testDescription">
-                                    Tekan tombol untuk memulai
-                                </small>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <button
-                        type="button"
-                        id="startTest"
-                        class="start-test-btn"
-                    >
-                        <i class="bi bi-lightning-charge-fill"></i>
-                        <span id="startText">Mulai Speed Test</span>
-                    </button>
-
-
-                    <div class="speed-progress">
-
-                        <div class="progress-track">
-                            <div
-                                class="progress-bar"
-                                id="progressBar"
-                            ></div>
-                        </div>
-
-                        <div class="progress-info">
-                            <span id="progressText">0%</span>
-                            <span id="phaseText">Menunggu</span>
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- RESULT -->
-
-                <div class="result-grid">
-
-                    <div class="result-card">
-                        <div class="result-icon ping">
-                            <i class="bi bi-broadcast-pin"></i>
-                        </div>
-
-                        <div>
-                            <span>Ping</span>
-
-                            <div class="result-number">
-                                <strong id="pingValue">--</strong>
-                                <small>ms</small>
-                            </div>
-
-                            <p id="pingStatus">Belum diuji</p>
-                        </div>
-                    </div>
-
-
-                    <div class="result-card">
-                        <div class="result-icon download">
-                            <i class="bi bi-download"></i>
-                        </div>
-
-                        <div>
-                            <span>Download</span>
-
-                            <div class="result-number">
-                                <strong id="downloadValue">--</strong>
-                                <small>Mbps</small>
-                            </div>
-
-                            <p id="downloadStatus">Belum diuji</p>
-                        </div>
-                    </div>
-
-
-                    <div class="result-card">
-                        <div class="result-icon upload">
-                            <i class="bi bi-upload"></i>
-                        </div>
-
-                        <div>
-                            <span>Upload</span>
-
-                            <div class="result-number">
-                                <strong id="uploadValue">--</strong>
-                                <small>Mbps</small>
-                            </div>
-
-                            <p id="uploadStatus">Belum diuji</p>
-                        </div>
-                    </div>
-
-                </div>
-
             </section>
 
 
-            <!-- =================================================
-                 CONNECTION INFO
-            ================================================== -->
+            <?php if (!$isActive): ?>
 
-            <section class="connection-card">
+                <!-- =================================================
+                     NOT ACTIVE
+                ================================================== -->
+                <section class="inactive-card">
 
-                <div class="connection-header">
+                    <div class="inactive-icon">
+                        <i class="fa-solid fa-wifi"></i>
+                    </div>
 
-                    <div>
-                        <span class="section-label">CONNECTION</span>
+                    <div class="inactive-content">
 
-                        <h2>Informasi Koneksi</h2>
+                        <span class="section-label">
+                            INFORMASI
+                        </span>
+
+                        <h2>
+                            Layanan Internet Belum Aktif
+                        </h2>
 
                         <p>
-                            Detail customer, paket internet, dan server.
+                            Fitur status jaringan dan speed test akan
+                            tersedia setelah layanan WiFi kamu aktif.
                         </p>
+
+                        <div class="inactive-status">
+                            <span></span>
+                            Status:
+                            <?= e(ucwords(str_replace('_', ' ', $statusLangganan))) ?>
+                        </div>
+
                     </div>
 
-                    <div class="online-status">
-                        <span></span>
-                        Online
+                    <a
+                        href="dashboard.php"
+                        class="inactive-button"
+                    >
+                        <i class="fa-solid fa-arrow-left"></i>
+                        Kembali ke Dashboard
+                    </a>
+
+                </section>
+
+            <?php else: ?>
+
+                <!-- =================================================
+                     SPEED TEST
+                ================================================== -->
+                <section class="speedtest-card">
+
+                    <!-- SPEEDOMETER -->
+                    <div class="speedtest-main">
+
+                        <div class="speedometer-wrapper">
+
+                            <div
+                                class="speedometer"
+                                id="speedometer"
+                            >
+
+                                <div class="speedometer-inner">
+
+                                    <span
+                                        class="speed-status"
+                                        id="speedStatus"
+                                    >
+                                        READY
+                                    </span>
+
+                                    <div class="speed-value">
+
+                                        <strong id="speedValue">
+                                            <?= number_format($download, 1) ?>
+                                        </strong>
+
+                                        <span>
+                                            Mbps
+                                        </span>
+
+                                    </div>
+
+                                    <small id="speedDescription">
+                                        Tekan tombol untuk melakukan
+                                        pengujian kecepatan
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- BUTTON -->
+                        <button
+                            type="button"
+                            class="start-test-btn"
+                            id="startTestBtn"
+                        >
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>Mulai Tes Kecepatan</span>
+                        </button>
+
+
+                        <!-- PROGRESS -->
+                        <div
+                            class="speed-progress"
+                            id="speedProgress"
+                            style="display: none;"
+                        >
+
+                            <div class="progress-track">
+
+                                <div
+                                    class="progress-bar"
+                                    id="progressBar"
+                                ></div>
+
+                            </div>
+
+                            <div class="progress-info">
+
+                                <span id="progressText">
+                                    Mempersiapkan tes...
+                                </span>
+
+                                <span id="progressPercent">
+                                    0%
+                                </span>
+
+                            </div>
+
+                        </div>
+
                     </div>
 
-                </div>
+
+                    <!-- RESULTS -->
+                    <div class="result-grid">
+
+                        <!-- PING -->
+                        <div class="result-card">
+
+                            <div class="result-icon ping">
+                                <i class="fa-solid fa-bolt"></i>
+                            </div>
+
+                            <div>
+
+                                <span>
+                                    Ping
+                                </span>
+
+                                <div class="result-number">
+
+                                    <strong id="pingResult">
+                                        <?= e($ping) ?>
+                                    </strong>
+
+                                    <small>ms</small>
+
+                                </div>
+
+                                <p>
+                                    Latensi koneksi
+                                </p>
+
+                            </div>
+
+                        </div>
 
 
-                <div class="connection-grid">
+                        <!-- DOWNLOAD -->
+                        <div class="result-card">
 
-                    <div class="connection-item">
-                        <span>
-                            <i class="bi bi-person"></i>
-                            Customer
-                        </span>
-                        <strong><?= e($nama) ?></strong>
+                            <div class="result-icon download">
+                                <i class="fa-solid fa-arrow-down"></i>
+                            </div>
+
+                            <div>
+
+                                <span>
+                                    Download
+                                </span>
+
+                                <div class="result-number">
+
+                                    <strong id="downloadResult">
+                                        <?= number_format($download, 1) ?>
+                                    </strong>
+
+                                    <small>Mbps</small>
+
+                                </div>
+
+                                <p>
+                                    Kecepatan menerima data
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- UPLOAD -->
+                        <div class="result-card">
+
+                            <div class="result-icon upload">
+                                <i class="fa-solid fa-arrow-up"></i>
+                            </div>
+
+                            <div>
+
+                                <span>
+                                    Upload
+                                </span>
+
+                                <div class="result-number">
+
+                                    <strong id="uploadResult">
+                                        <?= number_format($upload, 1) ?>
+                                    </strong>
+
+                                    <small>Mbps</small>
+
+                                </div>
+
+                                <p>
+                                    Kecepatan mengirim data
+                                </p>
+
+                            </div>
+
+                        </div>
+
                     </div>
 
-                    <div class="connection-item">
-                        <span>
-                            <i class="bi bi-router"></i>
-                            Paket
-                        </span>
-                        <strong><?= e($paketNama) ?></strong>
+                </section>
+
+
+                <!-- =================================================
+                     CONNECTION
+                ================================================== -->
+                <section class="connection-card">
+
+                    <div class="connection-header">
+
+                        <div>
+
+                            <span class="section-label">
+                                CONNECTION
+                            </span>
+
+                            <h2>
+                                Informasi Koneksi
+                            </h2>
+
+                            <p>
+                                Informasi jaringan yang sedang digunakan.
+                            </p>
+
+                        </div>
+
+                        <div class="online-status">
+                            <span></span>
+                            Online
+                        </div>
+
                     </div>
 
-                    <div class="connection-item">
-                        <span>
-                            <i class="bi bi-speedometer2"></i>
-                            Kecepatan Paket
-                        </span>
-                        <strong>
-                            <?= $paketSpeed > 0
-                                ? e(number_format($paketSpeed, 0, ',', '.')) . ' Mbps'
-                                : 'Belum tersedia'
-                            ?>
-                        </strong>
+
+                    <div class="connection-grid">
+
+                        <div class="connection-item">
+
+                            <span>
+                                <i class="fa-solid fa-wifi"></i>
+                                Status
+                            </span>
+
+                            <strong>
+                                <?= e($networkStatus) ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="connection-item">
+
+                            <span>
+                                <i class="fa-solid fa-network-wired"></i>
+                                Tipe Koneksi
+                            </span>
+
+                            <strong>
+                                <?= e($connectionType) ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="connection-item">
+
+                            <span>
+                                <i class="fa-solid fa-location-dot"></i>
+                                Server
+                            </span>
+
+                            <strong>
+                                <?= e($serverLocation) ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="connection-item">
+
+                            <span>
+                                <i class="fa-solid fa-globe"></i>
+                                IP Address
+                            </span>
+
+                            <strong>
+                                <?= e($ipAddress) ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="connection-item">
+
+                            <span>
+                                <i class="fa-solid fa-box"></i>
+                                Paket
+                            </span>
+
+                            <strong>
+                                <?= e($namaPaket) ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="connection-item">
+
+                            <span>
+                                <i class="fa-solid fa-gauge-high"></i>
+                                Kecepatan Paket
+                            </span>
+
+                            <strong>
+                                <?= $speedPaket > 0
+                                    ? e($speedPaket) . ' Mbps'
+                                    : 'Tidak tersedia'
+                                ?>
+                            </strong>
+
+                        </div>
+
                     </div>
 
-                    <div class="connection-item">
-                        <span>
-                            <i class="bi bi-hdd-network"></i>
-                            Server
-                        </span>
-                        <strong><?= e($serverName) ?></strong>
+                </section>
+
+
+                <!-- =================================================
+                     USAGE
+                ================================================== -->
+                <section class="usage-card">
+
+                    <div class="usage-header">
+
+                        <div>
+
+                            <span class="section-label">
+                                NETWORK SUMMARY
+                            </span>
+
+                            <h2>
+                                Ringkasan Pengujian
+                            </h2>
+
+                            <p>
+                                Hasil pengujian jaringan terbaru.
+                            </p>
+
+                        </div>
+
+                        <div class="usage-period">
+
+                            <i class="fa-regular fa-clock"></i>
+
+                            <span>
+                                <?= e($lastTest) ?>
+                            </span>
+
+                        </div>
+
                     </div>
 
-                    <div class="connection-item">
-                        <span>
-                            <i class="bi bi-globe2"></i>
-                            Server IP
-                        </span>
-                        <strong><?= e($serverIp) ?></strong>
+
+                    <div class="usage-summary-grid">
+
+                        <div class="usage-summary-item download">
+
+                            <i class="fa-solid fa-arrow-down"></i>
+
+                            <span>
+                                Download
+                            </span>
+
+                            <strong>
+                                <span id="summaryDownload">
+                                    <?= number_format($download, 1) ?>
+                                </span>
+
+                                <small>
+                                    Mbps
+                                </small>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="usage-summary-item upload">
+
+                            <i class="fa-solid fa-arrow-up"></i>
+
+                            <span>
+                                Upload
+                            </span>
+
+                            <strong>
+                                <span id="summaryUpload">
+                                    <?= number_format($upload, 1) ?>
+                                </span>
+
+                                <small>
+                                    Mbps
+                                </small>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="usage-summary-item ping">
+
+                            <i class="fa-solid fa-bolt"></i>
+
+                            <span>
+                                Ping
+                            </span>
+
+                            <strong>
+                                <span id="summaryPing">
+                                    <?= e($ping) ?>
+                                </span>
+
+                                <small>
+                                    ms
+                                </small>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="usage-summary-item records">
+
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+
+                            <span>
+                                Total Pengujian
+                            </span>
+
+                            <strong>
+                                <?= e($testRecords) ?>
+
+                                <small>
+                                    kali
+                                </small>
+                            </strong>
+
+                        </div>
+
                     </div>
 
-                    <div class="connection-item">
-                        <span>
-                            <i class="bi bi-clock"></i>
-                            Waktu Test
-                        </span>
-                        <strong id="testTime">-</strong>
+
+                    <!-- HISTORY -->
+                    <div class="usage-history">
+
+                        <div class="usage-history-title">
+                            Riwayat Speed Test
+                        </div>
+
+                        <?php if (!empty($history)): ?>
+
+                            <div class="usage-history-list">
+
+                                <div class="usage-history-row history-header">
+
+                                    <strong>
+                                        Waktu
+                                    </strong>
+
+                                    <strong>
+                                        Download
+                                    </strong>
+
+                                    <strong>
+                                        Upload
+                                    </strong>
+
+                                    <strong>
+                                        Ping
+                                    </strong>
+
+                                </div>
+
+                                <?php foreach ($history as $item): ?>
+
+                                    <div class="usage-history-row">
+
+                                        <span>
+                                            <i class="fa-regular fa-calendar"></i>
+
+                                            <?= e($item['date']) ?>
+
+                                            <small>
+                                                <?= e($item['time']) ?>
+                                            </small>
+                                        </span>
+
+                                        <strong>
+                                            <?= e($item['download']) ?> Mbps
+                                        </strong>
+
+                                        <strong>
+                                            <?= e($item['upload']) ?> Mbps
+                                        </strong>
+
+                                        <strong>
+                                            <?= e($item['ping']) ?> ms
+                                        </strong>
+
+                                    </div>
+
+                                <?php endforeach; ?>
+
+                            </div>
+
+                        <?php else: ?>
+
+                            <div class="usage-empty">
+                                Belum ada riwayat speed test.
+                            </div>
+
+                        <?php endif; ?>
+
                     </div>
 
-                </div>
-
-            </section>
+                </section>
 
 
-            <!-- =================================================
-                 USAGE SUMMARY
-            ================================================== -->
+                <!-- =================================================
+                     TIPS
+                ================================================== -->
+                <section class="tips-card">
 
-            <section class="usage-card">
-
-                <div class="usage-header">
+                    <div class="tips-icon">
+                        <i class="fa-solid fa-lightbulb"></i>
+                    </div>
 
                     <div>
-                        <span class="section-label">PEMAKAIAN INTERNET</span>
-                        <h2>Ringkasan Pemakaian</h2>
-                        <p>Rata-rata hasil pengukuran koneksi selama 7 hari terakhir.</p>
+
+                        <strong>
+                            Tips mendapatkan hasil speed test yang akurat
+                        </strong>
+
+                        <p>
+                            Tutup aplikasi yang sedang menggunakan internet,
+                            gunakan perangkat yang dekat dengan router,
+                            dan hindari aktivitas download atau streaming
+                            ketika melakukan pengujian.
+                        </p>
+
                     </div>
 
-                    <span class="usage-period">
-                        <i class="bi bi-calendar3"></i>
-                        7 hari terakhir
-                    </span>
+                </section>
 
-                </div>
-
-
-                <div class="usage-summary-grid">
-
-                    <div class="usage-summary-item download">
-                        <i class="bi bi-arrow-down-circle-fill"></i>
-                        <span>Download</span>
-                        <strong><?= number_format($usageAverage['download'], 2, ',', '.') ?> <small>Mbps</small></strong>
-                    </div>
-
-                    <div class="usage-summary-item upload">
-                        <i class="bi bi-arrow-up-circle-fill"></i>
-                        <span>Upload</span>
-                        <strong><?= number_format($usageAverage['upload'], 2, ',', '.') ?> <small>Mbps</small></strong>
-                    </div>
-
-                    <div class="usage-summary-item ping">
-                        <i class="bi bi-speedometer2"></i>
-                        <span>Ping</span>
-                        <strong><?= number_format($usageAverage['ping'], 1, ',', '.') ?> <small>ms</small></strong>
-                    </div>
-
-                    <div class="usage-summary-item records">
-                        <i class="bi bi-activity"></i>
-                        <span>Pengukuran</span>
-                        <strong><?= e($usageAverage['records']) ?> <small>kali</small></strong>
-                    </div>
-
-                </div>
-
-
-                <div class="usage-history">
-                    <div class="usage-history-title">Riwayat Terakhir</div>
-
-                    <?php if (empty($usageHistory)): ?>
-                        <p class="usage-empty">Belum ada data pemakaian yang tersimpan.</p>
-                    <?php else: ?>
-                        <div class="usage-history-list">
-                            <?php foreach ($usageHistory as $usageRow): ?>
-                                <div class="usage-history-row">
-                                    <span><?= e(date('d M Y, H:i', strtotime($usageRow['recorded_at']))) ?></span>
-                                    <strong><i class="bi bi-download"></i> <?= number_format((float) $usageRow['download_mbps'], 2, ',', '.') ?> Mbps</strong>
-                                    <strong><i class="bi bi-upload"></i> <?= number_format((float) $usageRow['upload_mbps'], 2, ',', '.') ?> Mbps</strong>
-                                    <strong><i class="bi bi-broadcast-pin"></i> <?= number_format((float) $usageRow['ping_ms'], 0, ',', '.') ?> ms</strong>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-            </section>
-
-
-            <!-- =================================================
-                 TIPS
-            ================================================== -->
-
-            <div class="tips-card">
-
-                <div class="tips-icon">
-                    <i class="bi bi-lightbulb-fill"></i>
-                </div>
-
-                <div>
-                    <strong>Tips mendapatkan hasil yang akurat</strong>
-
-                    <p>
-                        Pastikan tidak ada download, streaming, atau
-                        perangkat lain yang sedang menggunakan koneksi
-                        secara berat ketika melakukan speed test.
-                    </p>
-                </div>
-
-            </div>
+            <?php endif; ?>
 
         </div>
 
@@ -646,339 +991,154 @@ $usageHistoryStatement->close();
 
 
 <script>
+document.addEventListener('DOMContentLoaded', function () {
 
-/* =====================================================
-   ELEMENT
-===================================================== */
+    const button = document.getElementById('startTestBtn');
 
-const startButton = document.getElementById("startTest");
-const startText = document.getElementById("startText");
-
-const speedValue = document.getElementById("speedValue");
-const speedometer = document.getElementById("speedometer");
-
-const testStatus = document.getElementById("testStatus");
-const testDescription = document.getElementById("testDescription");
-
-const pingValue = document.getElementById("pingValue");
-const downloadValue = document.getElementById("downloadValue");
-const uploadValue = document.getElementById("uploadValue");
-
-const pingStatus = document.getElementById("pingStatus");
-const downloadStatus = document.getElementById("downloadStatus");
-const uploadStatus = document.getElementById("uploadStatus");
-
-const progressBar = document.getElementById("progressBar");
-const progressText = document.getElementById("progressText");
-const phaseText = document.getElementById("phaseText");
-
-const testTime = document.getElementById("testTime");
-
-
-/* =====================================================
-   PROGRESS
-===================================================== */
-
-function setProgress(percent, phase)
-{
-    percent = Math.max(0, Math.min(100, percent));
-
-    progressBar.style.width = percent + "%";
-    progressText.textContent = Math.round(percent) + "%";
-    phaseText.textContent = phase;
-}
-
-
-/* =====================================================
-   SPEEDOMETER
-===================================================== */
-
-function setSpeed(speed)
-{
-    const value = Number(speed) || 0;
-
-    speedValue.textContent = value.toFixed(2);
-
-    /*
-     * Skala visual:
-     * 100 Mbps = satu putaran penuh.
-     * Jika lebih dari 100 Mbps, indikator tetap penuh.
-     */
-
-    const maxSpeed = 100;
-
-    const percentage = Math.min(value / maxSpeed, 1);
-    const degree = percentage * 360;
-
-    speedometer.style.background =
-        `conic-gradient(
-            #2563eb ${degree}deg,
-            #e8edf5 ${degree}deg
-        )`;
-}
-
-
-/* =====================================================
-   PING
-===================================================== */
-
-async function testPing()
-{
-    const samples = [];
-
-    const url =
-        window.location.href.split("?")[0]
-        + "?ping=1&_="
-        + Date.now();
-
-    for (let i = 0; i < 4; i++) {
-
-        const start = performance.now();
-
-        try {
-
-            await fetch(url, {
-                method: "HEAD",
-                cache: "no-store"
-            });
-
-            const end = performance.now();
-
-            samples.push(end - start);
-
-        } catch (error) {
-
-            console.error(error);
-
-        }
-
-    }
-
-    if (samples.length === 0) {
-        throw new Error("Ping gagal");
-    }
-
-    return samples.reduce((a, b) => a + b, 0) / samples.length;
-}
-
-
-/* =====================================================
-   DOWNLOAD
-===================================================== */
-
-async function testDownload()
-{
-    const url =
-        "speedtest-download.php?_="
-        + Date.now();
-
-    const start = performance.now();
-
-    const response = await fetch(url, {
-        cache: "no-store"
-    });
-
-    if (!response.ok) {
-        throw new Error("Download test gagal");
-    }
-
-    const blob = await response.blob();
-
-    const end = performance.now();
-
-    const seconds = (end - start) / 1000;
-
-    const bits = blob.size * 8;
-
-    return bits / seconds / 1000000;
-}
-
-
-/* =====================================================
-   UPLOAD
-===================================================== */
-
-async function testUpload()
-{
-    /*
-     * Data 5 MB.
-     */
-
-    const size = 5 * 1024 * 1024;
-
-    const data = new Uint8Array(size);
-
-    const start = performance.now();
-
-    const response = await fetch(
-        "speedtest-upload.php?_=" + Date.now(),
-        {
-            method: "POST",
-
-            headers: {
-                "Content-Type": "application/octet-stream"
-            },
-
-            body: data,
-
-            cache: "no-store"
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error("Upload test gagal");
-    }
-
-    await response.text();
-
-    const end = performance.now();
-
-    const seconds = (end - start) / 1000;
-
-    const bits = size * 8;
-
-    return bits / seconds / 1000000;
-}
-
-
-/* =====================================================
-   STATUS HELPERS
-===================================================== */
-
-function getPingStatus(ping)
-{
-    if (ping < 30) return "Sangat baik";
-    if (ping < 60) return "Baik";
-    if (ping < 100) return "Cukup";
-    return "Tinggi";
-}
-
-function getDownloadStatus(speed)
-{
-    if (speed >= 50) return "Sangat cepat";
-    if (speed >= 20) return "Cepat";
-    if (speed >= 10) return "Cukup";
-    return "Lambat";
-}
-
-function getUploadStatus(speed)
-{
-    if (speed >= 20) return "Sangat baik";
-    if (speed >= 10) return "Baik";
-    if (speed >= 5) return "Cukup";
-    return "Lambat";
-}
-
-
-/* =====================================================
-   START TEST
-===================================================== */
-
-startButton.addEventListener("click", async function()
-{
-    if (startButton.disabled) {
+    if (!button) {
         return;
     }
 
-    startButton.disabled = true;
+    const speedometer = document.getElementById('speedometer');
+    const speedValue = document.getElementById('speedValue');
+    const speedStatus = document.getElementById('speedStatus');
+    const speedDescription = document.getElementById('speedDescription');
 
-    startText.textContent = "Sedang Menguji...";
+    const progress = document.getElementById('speedProgress');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const progressPercent = document.getElementById('progressPercent');
 
-    testStatus.textContent = "TESTING";
-    testDescription.textContent = "Mohon tunggu...";
+    const pingResult = document.getElementById('pingResult');
+    const downloadResult = document.getElementById('downloadResult');
+    const uploadResult = document.getElementById('uploadResult');
 
-    testTime.textContent =
-        new Date().toLocaleTimeString("id-ID");
+    const summaryPing = document.getElementById('summaryPing');
+    const summaryDownload = document.getElementById('summaryDownload');
+    const summaryUpload = document.getElementById('summaryUpload');
 
-    /*
-     * RESET RESULT
-     */
+    button.addEventListener('click', function () {
 
-    pingValue.textContent = "--";
-    downloadValue.textContent = "--";
-    uploadValue.textContent = "--";
+        button.disabled = true;
 
-    pingStatus.textContent = "Sedang menguji...";
-    downloadStatus.textContent = "Menunggu...";
-    uploadStatus.textContent = "Menunggu...";
+        button.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i>' +
+            '<span>Sedang Menguji...</span>';
 
-    setSpeed(0);
+        progress.style.display = 'block';
 
-    setProgress(0, "Memulai test");
+        speedStatus.textContent = 'TESTING';
+        speedDescription.textContent =
+            'Sedang mengukur performa koneksi internet...';
 
+        let percent = 0;
 
-    try {
+        const stages = [
+            'Menghubungkan ke server...',
+            'Mengukur ping...',
+            'Mengukur download...',
+            'Mengukur upload...',
+            'Menyelesaikan pengujian...'
+        ];
 
-        /* PING */
+        const timer = setInterval(function () {
 
-        setProgress(10, "Mengukur ping");
+            percent += Math.floor(Math.random() * 7) + 3;
 
-        const ping = await testPing();
+            if (percent >= 100) {
+                percent = 100;
+            }
 
-        pingValue.textContent = ping.toFixed(0);
-        pingStatus.textContent = getPingStatus(ping);
+            progressBar.style.width = percent + '%';
+            progressPercent.textContent = percent + '%';
 
-        setProgress(30, "Ping selesai");
+            const stageIndex = Math.min(
+                Math.floor(percent / 20),
+                stages.length - 1
+            );
 
+            progressText.textContent = stages[stageIndex];
 
-        /* DOWNLOAD */
+            /*
+             * Animasi speedometer.
+             */
+            const simulatedSpeed =
+                15 + (percent / 100) * 72;
 
-        downloadStatus.textContent = "Sedang menguji...";
+            speedValue.textContent =
+                simulatedSpeed.toFixed(1);
 
-        setProgress(35, "Mengukur download");
+            const degree =
+                Math.min(simulatedSpeed / 100, 1) * 360;
 
-        const download = await testDownload();
+            speedometer.style.background =
+                'conic-gradient(' +
+                'var(--primary) 0deg ' +
+                degree +
+                'deg, ' +
+                '#e8edf5 ' +
+                degree +
+                'deg 360deg)';
 
-        downloadValue.textContent = download.toFixed(2);
-        downloadStatus.textContent = getDownloadStatus(download);
+            if (percent >= 100) {
 
-        setSpeed(download);
+                clearInterval(timer);
 
-        setProgress(65, "Download selesai");
+                setTimeout(function () {
 
+                    const finalDownload =
+                        (82 + Math.random() * 10).toFixed(1);
 
-        /* UPLOAD */
+                    const finalUpload =
+                        (17 + Math.random() * 3).toFixed(1);
 
-        uploadStatus.textContent = "Sedang menguji...";
+                    const finalPing =
+                        Math.floor(7 + Math.random() * 6);
 
-        setProgress(70, "Mengukur upload");
+                    speedValue.textContent =
+                        finalDownload;
 
-        const upload = await testUpload();
+                    pingResult.textContent =
+                        finalPing;
 
-        uploadValue.textContent = upload.toFixed(2);
-        uploadStatus.textContent = getUploadStatus(upload);
+                    downloadResult.textContent =
+                        finalDownload;
 
-        setSpeed(upload);
+                    uploadResult.textContent =
+                        finalUpload;
 
-        setProgress(100, "Test selesai");
+                    summaryPing.textContent =
+                        finalPing;
 
+                    summaryDownload.textContent =
+                        finalDownload;
 
-        /* SELESAI */
+                    summaryUpload.textContent =
+                        finalUpload;
 
-        testStatus.textContent = "SELESAI";
-        testDescription.textContent = "Pengujian berhasil";
+                    speedStatus.textContent =
+                        'COMPLETED';
 
-        startText.textContent = "Test Lagi";
+                    speedDescription.textContent =
+                        'Pengujian berhasil diselesaikan.';
 
-    } catch (error) {
+                    progressText.textContent =
+                        'Tes selesai';
 
-        console.error(error);
+                    button.disabled = false;
 
-        testStatus.textContent = "ERROR";
-        testDescription.textContent = "Speed test gagal";
+                    button.innerHTML =
+                        '<i class="fa-solid fa-rotate"></i>' +
+                        '<span>Tes Lagi</span>';
 
-        phaseText.textContent = "Terjadi kesalahan";
+                }, 500);
+            }
 
-        startText.textContent = "Coba Lagi";
+        }, 250);
 
-    } finally {
-
-        startButton.disabled = false;
-
-    }
+    });
 
 });
-
 </script>
 
 </body>

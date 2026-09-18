@@ -4,7 +4,43 @@ session_start();
 
 require_once "config/database.php";
 
-$error = "";
+require_once "config/database.php";
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+echo "<pre>";
+
+$result = $conn->query("SELECT DATABASE() AS db");
+$row = $result->fetch_assoc();
+
+echo "DATABASE YANG DIPAKAI PHP: ";
+print_r($row);
+
+echo "\n\nSTRUKTUR CUSTOMERS:\n";
+
+$result = $conn->query("DESCRIBE customers");
+
+while ($row = $result->fetch_assoc()) {
+    print_r($row);
+}
+
+echo "</pre>";
+
+exit;
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
+$error =
+    "REGISTRASI GAGAL: " .
+    $e->getMessage() .
+    " | FILE: " .
+    basename($e->getFile()) .
+    " | LINE: " .
+    $e->getLine();
 
 $nama      = "";
 $username  = "";
@@ -16,7 +52,35 @@ $alamat    = "";
 
 /*
 |--------------------------------------------------------------------------
-| PROSES REGISTRASI
+| HELPER
+|--------------------------------------------------------------------------
+*/
+
+function e($value): string
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CEK KONEKSI DATABASE
+|--------------------------------------------------------------------------
+*/
+
+if (!isset($conn) || !($conn instanceof mysqli)) {
+
+    die("Koneksi database tidak tersedia.");
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PROSES REGISTER
 |--------------------------------------------------------------------------
 */
 
@@ -39,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDASI DASAR
+    | VALIDASI
     |--------------------------------------------------------------------------
     */
 
@@ -54,388 +118,487 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ) {
 
         $error = "Semua field wajib diisi.";
+    }
 
-    } elseif (strlen($nama) < 3) {
+    elseif (strlen($nama) < 3) {
 
         $error = "Nama minimal 3 karakter.";
+    }
 
-    } elseif (strlen($username) < 4) {
+    elseif (strlen($nama) > 150) {
 
-        $error = "Username minimal 4 karakter.";
+        $error = "Nama maksimal 150 karakter.";
+    }
 
-    } elseif (strlen($username) > 50) {
+    elseif (strlen($username) < 3) {
+
+        $error = "Username minimal 3 karakter.";
+    }
+
+    elseif (strlen($username) > 50) {
 
         $error = "Username maksimal 50 karakter.";
+    }
 
-    } elseif (!preg_match('/^[a-zA-Z0-9_.]+$/', $username)) {
+    elseif (!preg_match('/^[a-zA-Z0-9_.]+$/', $username)) {
 
-        $error = "Username hanya boleh menggunakan huruf, angka, titik (.) dan underscore (_).";
+        $error =
+            "Username hanya boleh menggunakan huruf, angka, titik dan underscore.";
+    }
 
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
         $error = "Format email tidak valid.";
+    }
 
-    } elseif (strlen($password) < 6) {
+    elseif (strlen($email) > 150) {
+
+        $error = "Email maksimal 150 karakter.";
+    }
+
+    elseif (strlen($telephone) > 30) {
+
+        $error = "Nomor telepon maksimal 30 karakter.";
+    }
+
+    elseif (strlen($password) < 6) {
 
         $error = "Password minimal 6 karakter.";
+    }
 
-    } elseif (!preg_match('/^[0-9]+$/', $nik)) {
+    elseif (!preg_match('/^[0-9]+$/', $nik)) {
 
         $error = "NIK hanya boleh berisi angka.";
+    }
 
-    } elseif (strlen($nik) < 10) {
+    elseif (strlen($nik) < 10) {
 
-        $error = "NIK tidak valid.";
+        $error = "NIK minimal 10 angka.";
+    }
 
-    } else {
+    elseif (strlen($nik) > 50) {
+
+        $error = "NIK maksimal 50 angka.";
+    }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | CEK USERNAME
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | CEK USERNAME
+    |--------------------------------------------------------------------------
+    */
 
-        $checkUsername = $conn->prepare("
-            SELECT id
-            FROM users
-            WHERE username = ?
-            LIMIT 1
-        ");
+    if ($error === '') {
 
-        if (!$checkUsername) {
+        try {
 
-            $error = "Gagal memeriksa username: " . $conn->error;
+            $stmt = $conn->prepare("
+                SELECT id
+                FROM users
+                WHERE username = ?
+                LIMIT 1
+            ");
 
-        } else {
-
-            $checkUsername->bind_param(
+            $stmt->bind_param(
                 "s",
                 $username
             );
 
-            $checkUsername->execute();
+            $stmt->execute();
 
-            $resultUsername = $checkUsername->get_result();
+            $result = $stmt->get_result();
 
-            if ($resultUsername->num_rows > 0) {
+            if ($result->num_rows > 0) {
 
-                $error = "Username sudah digunakan. Silakan pilih username lain.";
+                $error =
+                    "Username sudah digunakan. Silakan pilih username lain.";
             }
 
-            $checkUsername->close();
+            $stmt->close();
+
+        } catch (Throwable $e) {
+
+            $error =
+                "Gagal mengecek username: " .
+                $e->getMessage();
         }
+    }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | CEK EMAIL
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | CEK EMAIL
+    |--------------------------------------------------------------------------
+    */
 
-        if ($error === "") {
+    if ($error === '') {
 
-            $checkEmail = $conn->prepare("
+        try {
+
+            $stmt = $conn->prepare("
                 SELECT id
-                FROM users
+                FROM customers
                 WHERE email = ?
                 LIMIT 1
             ");
 
-            if (!$checkEmail) {
+            $stmt->bind_param(
+                "s",
+                $email
+            );
 
-                $error = "Gagal memeriksa email: " . $conn->error;
+            $stmt->execute();
 
-            } else {
+            $result = $stmt->get_result();
 
-                $checkEmail->bind_param(
-                    "s",
-                    $email
-                );
+            if ($result->num_rows > 0) {
 
-                $checkEmail->execute();
-
-                $resultEmail = $checkEmail->get_result();
-
-                if ($resultEmail->num_rows > 0) {
-
-                    $error = "Email sudah terdaftar.";
-                }
-
-                $checkEmail->close();
+                $error =
+                    "Email sudah terdaftar.";
             }
+
+            $stmt->close();
+
+        } catch (Throwable $e) {
+
+            $error =
+                "Gagal mengecek email: " .
+                $e->getMessage();
         }
+    }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | CEK NIK
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | CEK NIK
+    |--------------------------------------------------------------------------
+    */
 
-        if ($error === "") {
+    if ($error === '') {
 
-            $checkNik = $conn->prepare("
+        try {
+
+            $stmt = $conn->prepare("
                 SELECT id
                 FROM customers
                 WHERE nik = ?
                 LIMIT 1
             ");
 
-            if (!$checkNik) {
+            $stmt->bind_param(
+                "s",
+                $nik
+            );
 
-                $error = "Gagal memeriksa NIK: " . $conn->error;
+            $stmt->execute();
 
-            } else {
+            $result = $stmt->get_result();
 
-                $checkNik->bind_param(
-                    "s",
-                    $nik
-                );
+            if ($result->num_rows > 0) {
 
-                $checkNik->execute();
-
-                $resultNik = $checkNik->get_result();
-
-                if ($resultNik->num_rows > 0) {
-
-                    $error = "NIK sudah terdaftar.";
-                }
-
-                $checkNik->close();
+                $error =
+                    "NIK sudah terdaftar.";
             }
+
+            $stmt->close();
+
+        } catch (Throwable $e) {
+
+            $error =
+                "Gagal mengecek NIK: " .
+                $e->getMessage();
         }
+    }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | SIMPAN DATA
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | SIMPAN DATA
+    |--------------------------------------------------------------------------
+    */
 
-        if ($error === "") {
+    if ($error === '') {
+
+        try {
+
+            /*
+            |------------------------------------------------------------------
+            | MULAI TRANSAKSI
+            |------------------------------------------------------------------
+            */
+
+            $conn->begin_transaction();
+
+
+            /*
+            |------------------------------------------------------------------
+            | HASH PASSWORD
+            |------------------------------------------------------------------
+            */
 
             $passwordHash = password_hash(
                 $password,
                 PASSWORD_DEFAULT
             );
 
+            if ($passwordHash === false) {
+
+                throw new Exception(
+                    "Password gagal diproses."
+                );
+            }
+
 
             /*
             |--------------------------------------------------------------------------
-            | MULAI TRANSACTION
+            | INSERT USERS
+            |--------------------------------------------------------------------------
+            |
+            | Struktur users:
+            |
+            | id
+            | username
+            | nama
+            | password
+            | role
+            | status
+            |
+            */
+
+            $stmt = $conn->prepare("
+                INSERT INTO users
+                (
+                    username,
+                    nama,
+                    password,
+                    role,
+                    status
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    'customer',
+                    1
+                )
+            ");
+
+            /*
+            | Ada 3 tanda ?:
+            |
+            | 1 = username
+            | 2 = nama
+            | 3 = password
+            |
+            | Jadi:
+            | sss
+            */
+
+            $stmt->bind_param(
+                "sss",
+                $username,
+                $nama,
+                $passwordHash
+            );
+
+            $stmt->execute();
+
+            $userId = (int) $conn->insert_id;
+
+            $stmt->close();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PASTIKAN USER BERHASIL DIBUAT
             |--------------------------------------------------------------------------
             */
 
-            $conn->begin_transaction();
+            if ($userId <= 0) {
+
+                throw new Exception(
+                    "User ID gagal dibuat."
+                );
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | INSERT CUSTOMERS
+            |--------------------------------------------------------------------------
+            |
+            | paket_id = NULL
+            |
+            | Karena user baru belum memilih paket.
+            |
+            | status_langganan = belum_berlangganan
+            |
+            */
+
+            $stmt = $conn->prepare("
+                INSERT INTO customers
+                (
+                    user_id,
+                    paket_id,
+                    nama,
+                    telephone,
+                    email,
+                    nik,
+                    alamat,
+                    status_langganan
+                )
+                VALUES
+                (
+                    ?,
+                    NULL,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    'belum_berlangganan'
+                )
+            ");
+
+            /*
+            | Ada 6 tanda ?:
+            |
+            | 1 = userId
+            | 2 = nama
+            | 3 = telephone
+            | 4 = email
+            | 5 = nik
+            | 6 = alamat
+            |
+            | Jadi:
+            | isssss
+            */
+
+            $stmt->bind_param(
+                "isssss",
+                $userId,
+                $nama,
+                $telephone,
+                $email,
+                $nik,
+                $alamat
+            );
+
+            $stmt->execute();
+
+            $customerId = (int) $conn->insert_id;
+
+            $stmt->close();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PASTIKAN CUSTOMER BERHASIL DIBUAT
+            |--------------------------------------------------------------------------
+            */
+
+            if ($customerId <= 0) {
+
+                throw new Exception(
+                    "Customer ID gagal dibuat."
+                );
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | COMMIT
+            |--------------------------------------------------------------------------
+            */
+
+            $conn->commit();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | BUAT SESSION CUSTOMER
+            |--------------------------------------------------------------------------
+            */
+
+            session_regenerate_id(true);
+
+            $_SESSION['user_id'] = $userId;
+
+            $_SESSION['customer_id'] = $customerId;
+
+            $_SESSION['username'] = $username;
+
+            $_SESSION['nama'] = $nama;
+
+            $_SESSION['email'] = $email;
+
+            $_SESSION['telephone'] = $telephone;
+
+            $_SESSION['nik'] = $nik;
+
+            $_SESSION['alamat'] = $alamat;
+
+            $_SESSION['role'] = 'customer';
+
+            $_SESSION['user_status'] = 1;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | REDIRECT KE LANGGANAN
+            |--------------------------------------------------------------------------
+            */
+
+            header(
+                "Location: customer/langganan.php"
+            );
+
+            exit;
+
+
+        } catch (Throwable $e) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | ROLLBACK
+            |--------------------------------------------------------------------------
+            */
 
             try {
 
-                /*
-                |--------------------------------------------------------------------------
-                | INSERT USERS
-                |--------------------------------------------------------------------------
-                */
-
-                $userStmt = $conn->prepare("
-                    INSERT INTO users
-                    (
-                        username,
-                        nama,
-                        email,
-                        telephone,
-                        password,
-                        role,
-                        status
-                    )
-                    VALUES
-                    (
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        'customer',
-                        1
-                    )
-                ");
-
-                if (!$userStmt) {
-
-                    throw new Exception(
-                        "Gagal menyiapkan data user: " .
-                        $conn->error
-                    );
-                }
-
-
-                $userStmt->bind_param(
-                    "sssss",
-                    $username,
-                    $nama,
-                    $email,
-                    $telephone,
-                    $passwordHash
-                );
-
-
-                if (!$userStmt->execute()) {
-
-                    throw new Exception(
-                        "Gagal membuat akun: " .
-                        $userStmt->error
-                    );
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | ID USER BARU
-                |--------------------------------------------------------------------------
-                */
-
-                $userId = $userStmt->insert_id;
-
-                $userStmt->close();
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CUSTOMER BELUM MEMILIKI PAKET
-                |--------------------------------------------------------------------------
-                |
-                | NULL berarti customer belum memilih paket.
-                |
-                */
-
-                $paketId = null;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | INSERT CUSTOMERS
-                |--------------------------------------------------------------------------
-                */
-
-                $customerStmt = $conn->prepare("
-                    INSERT INTO customers
-                    (
-                        user_id,
-                        paket_id,
-                        nama,
-                        telephone,
-                        email,
-                        nik,
-                        alamat,
-                        status_langganan
-                    )
-                    VALUES
-                    (
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        'belum_berlangganan'
-                    )
-                ");
-
-                if (!$customerStmt) {
-
-                    throw new Exception(
-                        "Gagal menyiapkan data customer: " .
-                        $conn->error
-                    );
-                }
-
-
-                $customerStmt->bind_param(
-                    "iisssss",
-                    $userId,
-                    $paketId,
-                    $nama,
-                    $telephone,
-                    $email,
-                    $nik,
-                    $alamat
-                );
-
-
-                if (!$customerStmt->execute()) {
-
-                    throw new Exception(
-                        "Gagal menyimpan data customer: " .
-                        $customerStmt->error
-                    );
-                }
-
-
-                $customerStmt->close();
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | COMMIT
-                |--------------------------------------------------------------------------
-                */
-
-                $conn->commit();
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | BUAT SESSION
-                |--------------------------------------------------------------------------
-                */
-
-                session_regenerate_id(true);
-
-                $_SESSION['user_id']     = (int) $userId;
-                $_SESSION['username']    = $username;
-                $_SESSION['nama']        = $nama;
-                $_SESSION['email']       = $email;
-                $_SESSION['role']        = 'customer';
-                $_SESSION['user_status'] = 1;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | REDIRECT KE PILIH PAKET
-                |--------------------------------------------------------------------------
-                */
-
-                header(
-                    "Location: customer/langganan.php"
-                );
-
-                exit;
-
-
-            } catch (Exception $e) {
-
-                /*
-                |--------------------------------------------------------------------------
-                | ROLLBACK
-                |--------------------------------------------------------------------------
-                */
-
                 $conn->rollback();
 
-                $error = $e->getMessage();
+            } catch (Throwable $rollbackError) {
+
+                // Tidak perlu ditampilkan.
             }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | TAMPILKAN ERROR
+            |--------------------------------------------------------------------------
+            */
+
+            $error =
+                "REGISTRASI GAGAL: " .
+                $e->getMessage() .
+                " | FILE: " .
+                basename($e->getFile()) .
+                " | LINE: " .
+                $e->getLine();
         }
     }
 }
 
 ?>
 
+
 <!DOCTYPE html>
 <html lang="id">
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <meta charset="UTF-8">
 
@@ -444,7 +607,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Daftar Akun - WiFi Management</title>
+    <meta
+        name="description"
+        content="Registrasi Customer WiFi Management System"
+    >
+
+    <title>
+        Daftar Akun - WiFi Management
+    </title>
 
 
     <!-- Bootstrap -->
@@ -467,7 +637,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <link
         rel="stylesheet"
-        href="assets/css/register.css"
+        href="assets/css/register.css?v=6"
     >
 
 </head>
@@ -476,9 +646,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 
 
-<!-- BACKGROUND -->
-
 <div class="background-circle circle-1"></div>
+
 <div class="background-circle circle-2"></div>
 
 
@@ -506,15 +675,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
             <h1>
+
                 Selamat Datang di
-                <span>WiFi Management</span>
+
+                <span>
+                    WiFi Management
+                </span>
+
             </h1>
 
 
             <p>
+
                 Buat akun pelanggan untuk mengelola
                 layanan internet dengan lebih mudah,
                 cepat, dan praktis.
+
             </p>
 
 
@@ -524,7 +700,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="feature-item">
 
                     <div class="feature-icon">
+
                         <i class="bi bi-wifi"></i>
+
                     </div>
 
                     <span>
@@ -537,7 +715,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="feature-item">
 
                     <div class="feature-icon">
+
                         <i class="bi bi-receipt"></i>
+
                     </div>
 
                     <span>
@@ -550,7 +730,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="feature-item">
 
                     <div class="feature-icon">
+
                         <i class="bi bi-headset"></i>
+
                     </div>
 
                     <span>
@@ -563,7 +745,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="feature-item">
 
                     <div class="feature-icon">
+
                         <i class="bi bi-lightning-charge"></i>
+
                     </div>
 
                     <span>
@@ -574,6 +758,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
             </div>
+
 
         </div>
 
@@ -601,7 +786,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- ERROR -->
 
-            <?php if ($error !== ""): ?>
+            <?php if ($error !== ''): ?>
 
                 <div
                     class="alert alert-danger"
@@ -610,26 +795,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <i class="bi bi-exclamation-circle me-2"></i>
 
-                    <?= htmlspecialchars($error) ?>
+                    <?= e($error) ?>
 
                 </div>
 
             <?php endif; ?>
 
 
-            <!-- =================================================
-                 FORM
-            ================================================== -->
+            <!-- FORM -->
 
             <form
                 method="POST"
                 action=""
+                autocomplete="on"
             >
 
 
-                <!-- =============================================
-                     DATA PRIBADI
-                ============================================== -->
+                <!-- DATA PRIBADI -->
 
                 <div class="section-title">
 
@@ -663,7 +845,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Nama Lengkap
                     </label>
 
-
                     <div class="input-wrapper">
 
                         <i class="bi bi-person input-icon"></i>
@@ -674,8 +855,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="nama"
                             class="form-control"
                             placeholder="Masukkan nama lengkap"
-                            value="<?= htmlspecialchars($nama) ?>"
-                            maxlength="100"
+                            value="<?= e($nama) ?>"
+                            maxlength="150"
+                            autocomplete="name"
                             required
                         >
 
@@ -695,7 +877,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Email
                     </label>
 
-
                     <div class="input-wrapper">
 
                         <i class="bi bi-envelope input-icon"></i>
@@ -706,8 +887,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="email"
                             class="form-control"
                             placeholder="nama@email.com"
-                            value="<?= htmlspecialchars($email) ?>"
-                            maxlength="100"
+                            value="<?= e($email) ?>"
+                            maxlength="150"
+                            autocomplete="email"
                             required
                         >
 
@@ -727,7 +909,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Nomor Telepon
                     </label>
 
-
                     <div class="input-wrapper">
 
                         <i class="bi bi-telephone input-icon"></i>
@@ -738,8 +919,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="telephone"
                             class="form-control"
                             placeholder="08xxxxxxxxxx"
-                            value="<?= htmlspecialchars($telephone) ?>"
-                            maxlength="20"
+                            value="<?= e($telephone) ?>"
+                            maxlength="30"
+                            autocomplete="tel"
                             required
                         >
 
@@ -759,7 +941,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         NIK
                     </label>
 
-
                     <div class="input-wrapper">
 
                         <i class="bi bi-card-text input-icon"></i>
@@ -770,9 +951,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="nik"
                             class="form-control"
                             placeholder="Masukkan NIK"
-                            value="<?= htmlspecialchars($nik) ?>"
-                            maxlength="20"
+                            value="<?= e($nik) ?>"
+                            maxlength="50"
                             inputmode="numeric"
+                            autocomplete="off"
                             required
                         >
 
@@ -792,7 +974,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Alamat
                     </label>
 
-
                     <div class="input-wrapper textarea-wrapper">
 
                         <i class="bi bi-geo-alt input-icon"></i>
@@ -802,17 +983,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="alamat"
                             class="form-control"
                             placeholder="Masukkan alamat lengkap"
+                            autocomplete="street-address"
                             required
-                        ><?= htmlspecialchars($alamat) ?></textarea>
+                        ><?= e($alamat) ?></textarea>
 
                     </div>
 
                 </div>
 
 
-                <!-- =============================================
-                     DATA AKUN
-                ============================================== -->
+                <!-- DATA AKUN -->
 
                 <div class="section-title">
 
@@ -846,7 +1026,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Username
                     </label>
 
-
                     <div class="input-wrapper">
 
                         <i class="bi bi-person-badge input-icon"></i>
@@ -857,10 +1036,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="username"
                             class="form-control"
                             placeholder="Masukkan username"
-                            value="<?= htmlspecialchars($username) ?>"
+                            value="<?= e($username) ?>"
                             maxlength="50"
+                            minlength="3"
+                            autocomplete="username"
                             required
                         >
+
+                    </div>
+
+                    <div class="password-hint">
+
+                        <i class="bi bi-info-circle"></i>
+
+                        <span>
+                            Username minimal 3 karakter.
+                        </span>
 
                     </div>
 
@@ -878,7 +1069,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Password
                     </label>
 
-
                     <div class="input-wrapper">
 
                         <i class="bi bi-lock input-icon"></i>
@@ -890,9 +1080,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="form-control"
                             placeholder="Masukkan password"
                             minlength="6"
+                            autocomplete="new-password"
                             required
                         >
-
 
                         <button
                             type="button"
@@ -909,7 +1099,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </button>
 
                     </div>
-
 
                     <div class="password-hint">
 
@@ -971,23 +1160,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         </div>
 
+
     </div>
+
 
 </div>
 
 
 <script>
 
-function togglePassword() {
+function togglePassword()
+{
+    const password =
+        document.getElementById('password');
 
-    const password = document.getElementById('password');
-    const icon = document.getElementById('passwordIcon');
+    const icon =
+        document.getElementById('passwordIcon');
+
 
     if (password.type === 'password') {
 
         password.type = 'text';
 
         icon.classList.remove('bi-eye');
+
         icon.classList.add('bi-eye-slash');
 
     } else {
@@ -995,10 +1191,10 @@ function togglePassword() {
         password.type = 'password';
 
         icon.classList.remove('bi-eye-slash');
+
         icon.classList.add('bi-eye');
 
     }
-
 }
 
 </script>
